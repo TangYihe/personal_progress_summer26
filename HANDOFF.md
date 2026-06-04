@@ -27,17 +27,25 @@ GPU, i5-14600K + ASUS B760M-AYW support a 4090. Two open gates, both physical:
 
 GPU parked pending the colleague's physical check — no action needed until that report comes back.
 
-**Active focus = D (force & impedance control)** — chosen first for uninterrupted conceptual learning.
+**Reading mode (set 2026-06-03):** *I* read the papers; the agent assists — clarifies questions,
+verifies claims, and organizes my insights into the right notes doc. Collaborative, paper-by-paper.
 
-1. **D — Force & impedance control** → [notes/force-impedance-control/](notes/force-impedance-control/)
-   (`index.md` + `concepts.md`). Papers inbox seeded (5 works). **Suggested read order:** Adaptive
-   Compliance Policy (`2410.09309`) → variable impedance (`2603.14068`) → slow-fast trio (`2605.27886`,
-   ImplicitRDP `2512.10946`) → Torque-aware VLA (`2509.07962`). Dump rough understanding into
-   `concepts.md` as I go. Motivation: our robot data records joint torques/forces + supports impedance
-   control → want to try putting force into the policy. I'm less familiar here — budget time.
-2. **B — Mixed-data survey** (parked, ready) → [notes/lit-survey-mixed-training.md](notes/lit-survey-mixed-training.md).
-   Inbox prioritized into 4 tiers: survey (`2606.00054`) → GR00T N1 → hand/dexterous → browse VLA.
-   Good for lighter, modular reading sessions between D blocks.
+1. **B — Mixed-data survey** (active this session) → [notes/lit-survey-mixed-training.md](notes/lit-survey-mixed-training.md).
+   **Survey (`2606.00054`) done** — captured the 4-paradigm taxonomy, set our *adopter* reading
+   lens + stance on the field's 3 challenges (C1 low-priority, C2 bounded view-gap, C3 cheap-eval =
+   high-priority). Verdict: good map, shallow analysis → **read specific architectures next.**
+   **Now reading (2026-06-04):** **DexWild** (`2505.07813`) → **DexMachina** (`2510.08475`) —
+   dexterous-hand works, closest to our setting (read to surface the real technical challenges).
+   GR00T's human-data *schedule* already answered via agent (co-train, not sequential; pretrain
+   ratio unreported) → full GR00T deep-read deferred. **DreamZero parked** (lean VLA route + DP/ACT
+   first; see survey note). Two open threads to resolve while reading: **action-space** (abs vs.
+   rel) view-robustness, and **training-MSE-as-eval-proxy** (our C3 answer; EgoVerse lead).
+2. **D — Force & impedance control** → [notes/force-impedance-control/](notes/force-impedance-control/)
+   (`index.md` + `concepts.md`). **Not started.** Inbox seeded (5 works). **Suggested read order:**
+   Adaptive Compliance Policy (`2410.09309`) → variable impedance (`2603.14068`) → slow-fast trio
+   (`2605.27886`, ImplicitRDP `2512.10946`) → Torque-aware VLA (`2509.07962`). Motivation: our robot
+   data records joint torques/forces + supports impedance control → want to try putting force into
+   the policy. Less familiar here — budget time.
 
 ## Watch out / open threads
 

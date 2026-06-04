@@ -5,7 +5,7 @@
 > in `notes/` (created as we reach each milestone). For session-level "where we left off",
 > see [HANDOFF.md](HANDOFF.md). For how this repo is organized, see [AGENTS.md](AGENTS.md).
 >
-> Last updated: 2026-06-02
+> Last updated: 2026-06-03
 
 ---
 
@@ -34,7 +34,7 @@ Status legend: 🟢 unblocked now · 🟡 needs data/compute · ⚪ if time
 | # | Workstream | Status |
 |---|-----------|--------|
 | C | **Compute conversation** — confirm GPU for workstation, source of training GPUs, infra help. *Gates everything downstream.* | 🟢 |
-| B | **Mixed-data literature survey** — how recent work does human (no-robot) + robot teleop training: backbone · action head · training schedule. Produce my own notes + a list of options to try. ([notes](notes/lit-survey-mixed-training.md)) | 🟢 |
+| B | **Mixed-data literature survey** — how recent work does human (no-robot) + robot teleop training: backbone · action head · training schedule. Produce my own notes + a list of options to try. ([notes](notes/lit-survey-mixed-training.md) · [decisions & caveats](notes/decisions-and-caveats.md)) | 🟢 |
 | D | **Background reading** — force/impedance control, incl. building intuition + whether to put force into the policy ([notes](notes/force-impedance-control/index.md)); ⚪ large-scale/multi-GPU training; ⚪ Physical Intelligence series + RL post-training. | 🟢 / ⚪ |
 | A | **Data-quality validation** — replay success-rate sanity check (cheap, on real robot) → then DP / ACT to validate data quality. | 🟡 |
 
@@ -76,6 +76,10 @@ while waiting on data) → **D reading** in parallel. Once data exists: **A** (r
 
 Concise, dated, newest first. Big moments only — session detail lives in HANDOFF.
 
+- **2026-06-03** — B (mixed-data survey): processed the overview survey ([2606.00054](https://arxiv.org/abs/2606.00054))
+  — captured the 4-paradigm taxonomy, set our *adopter* reading lens + stance on the field's three
+  challenges. Verdict: good map, shallow analysis → read specific architectures next (GR00T N1, then
+  DexMachina — dexterous-hand works prioritized). Set the reading workflow: I read, agent organizes.
 - **2026-06-02** — Compute conversation (C) with advisor: large-scale training resources
   will be **abundant** (details in a couple of days); local prototyping GPU to be sourced via
   ops/management colleagues. Kickoff sync; tasked to lead model training ("explore" phase).
