@@ -3,7 +3,7 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: 2026-06-03
+> Last session: 2026-06-05 (week wrap)
 
 ---
 
@@ -30,24 +30,32 @@ GPU parked pending the colleague's physical check — no action needed until tha
 **Reading mode (set 2026-06-03):** *I* read the papers; the agent assists — clarifies questions,
 verifies claims, and organizes my insights into the right notes doc. Collaborative, paper-by-paper.
 
-1. **B — Mixed-data survey** (active this session) → [notes/lit-survey-mixed-training.md](notes/lit-survey-mixed-training.md).
-   **Survey (`2606.00054`) done** — captured the 4-paradigm taxonomy, set our *adopter* reading
-   lens + stance on the field's 3 challenges (C1 low-priority, C2 bounded view-gap, C3 cheap-eval =
-   high-priority). Verdict: good map, shallow analysis → **read specific architectures next.**
-   **Now reading (2026-06-04):** **DexWild** (`2505.07813`) → **DexMachina** (`2510.08475`) —
-   dexterous-hand works, closest to our setting (read to surface the real technical challenges).
-   GR00T's human-data *schedule* already answered via agent (co-train, not sequential; pretrain
-   ratio unreported) → full GR00T deep-read deferred. **DreamZero parked** (lean VLA route + DP/ACT
-   first; see survey note). Two open threads to resolve while reading: **action-space** (abs vs.
-   rel) view-robustness, and **training-MSE-as-eval-proxy** (our C3 answer; EgoVerse lead).
-2. **D — Force & impedance control** → [notes/force-impedance-control/](notes/force-impedance-control/)
-   (`index.md` + `concepts.md`). **Not started.** Inbox seeded (5 works). **Suggested read order:**
-   Adaptive Compliance Policy (`2410.09309`) → variable impedance (`2603.14068`) → slow-fast trio
-   (`2605.27886`, ImplicitRDP `2512.10946`) → Torque-aware VLA (`2509.07962`). Motivation: our robot
-   data records joint torques/forces + supports impedance control → want to try putting force into
-   the policy. Less familiar here — budget time.
+1. **B — Mixed-data survey** → [notes/lit-survey-mixed-training.md](notes/lit-survey-mixed-training.md).
+   **Done this week:** survey (`2606.00054`), **DexWild** (`2505.07813`), **DexMachina** (`2505.24853`),
+   **ManipTrans** (`2503.21860`). **Through-line:** kinematic retargeting fails on dexterous,
+   contact-rich tasks → functional retargeting via **residual-RL-on-a-base + contact** — but the strong
+   real-world results all lean on **sim → sim-to-real**. **Crystallizing question for us:** *can we get
+   the residual-on-base + contact structure working **sim-free**, bootstrapped by our robot data?*
+   **Pick up next:** **compile the dexterous-manipulation + RL background reading list** (expand from
+   survey §6). Groups: RL + demos (DAPG), **real-world / sim-free RL** (Xu `2212.09902`), human→dex
+   transfer (DexMachina / ManipTrans / Park `2501.04169`), sim-to-real dexterity, **RL-post-IL
+   (RL-100)**. Then read the sim-free picks first (Park `2501.04169`, Xu `2212.09902`) + RL-100.
+   Open threads (tracked in [ledger](notes/decisions-and-caveats.md)): action-space abs-vs-rel;
+   training-MSE-as-eval-proxy (C3); egocentric main-obs alignment (+ AprilTag inpainting); human↔robot
+   **speed mismatch**; **mixing ratio** (DexWild's **1:2 robot:human** = our starting point).
+2. **D — Force & impedance control** — **DEFERRED** (pushed all week; not started) →
+   [notes/force-impedance-control/](notes/force-impedance-control/). Inbox 5 works; read order: Adaptive
+   Compliance Policy (`2410.09309`) → variable impedance (`2603.14068`) → slow-fast trio (`2605.27886`,
+   ImplicitRDP `2512.10946`) → Torque-aware VLA (`2509.07962`). Now also ties to **contact-without-sim**
+   (can hand-hardware **joint torque** supply contact signal?). Deserves its own focused block.
+3. **A — Next-week experiment plan** — **pending** (for when robot + teleop data arrive): **ACT/DP
+   overfit-on-robot-data** check + **human-data replay** check → then derive remaining lit gaps.
 
 ## Watch out / open threads
 
 - GPU: awaiting colleague's case-clearance + PSU-label report.
 - Awaiting large-scale training-resource details from advisor (~6.4–6.5).
+- Design threads accumulating in [decisions-and-caveats.md](notes/decisions-and-caveats.md):
+  hand-pose tracking, relative-action space, egocentric main-obs alignment, speed mismatch,
+  mixing ratio, RL & sim dependency, vision encoder, contact sensing.
+- Queued: dexterous + RL background list (incl. **RL-100**); force-control basics; A experiment plan.

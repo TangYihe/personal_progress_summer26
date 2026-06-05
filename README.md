@@ -5,7 +5,7 @@
 > in `notes/` (created as we reach each milestone). For session-level "where we left off",
 > see [HANDOFF.md](HANDOFF.md). For how this repo is organized, see [AGENTS.md](AGENTS.md).
 >
-> Last updated: 2026-06-03
+> Last updated: 2026-06-05
 
 ---
 
@@ -76,6 +76,18 @@ while waiting on data) → **D reading** in parallel. Once data exists: **A** (r
 
 Concise, dated, newest first. Big moments only — session detail lives in HANDOFF.
 
+- **2026-06-05** — B (dexterous deep-dive): read **DexWild**, **DexMachina**, **ManipTrans**.
+  Through-line: **kinematic retargeting fails on dexterous contact-rich tasks** → functional
+  retargeting via **residual-RL-on-a-base + contact**, but strong real-world results all rely on
+  **sim → sim-to-real**. Our crystallizing question: *can we do residual-on-base + contact **sim-free**,
+  bootstrapped by robot data?* Logged many adopt-items + caveats to the ledger; fixed DexMachina's
+  arxiv id (`2505.24853`, not `2510.08475`=DexMan). **Next:** dexterous + RL background list (RL-100).
+  Force-control basics deferred.
+- **2026-06-04** — B: GR00T/DreamZero human-data schedule clarified (both **co-train, not
+  sequential**; GR00T omits its pretrain mixing ratio) → **parked DreamZero**, leaning **VLA route**
+  (+ DP/ACT first). Started **DexWild** (closest-match work): AprilTag-glove hand tracking, relative
+  wrist-pose actions, matched wrist cams. Created the [decisions & caveats ledger](notes/decisions-and-caveats.md);
+  surfaced **egocentric main-obs alignment** as a likely challenge for us.
 - **2026-06-03** — B (mixed-data survey): processed the overview survey ([2606.00054](https://arxiv.org/abs/2606.00054))
   — captured the 4-paradigm taxonomy, set our *adopter* reading lens + stance on the field's three
   challenges. Verdict: good map, shallow analysis → read specific architectures next (GR00T N1, then

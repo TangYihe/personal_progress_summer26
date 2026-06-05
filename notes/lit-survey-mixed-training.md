@@ -77,7 +77,7 @@ What to extract while reading:
 - **EgoScale** (NVIDIA et al., 2026) — https://arxiv.org/abs/2602.16710 — 20.8K hrs action-labeled egocentric human pretrain; scaling law; reportedly feeds GR00T N1.7. Central to our direction.
 - **DexUMI** — https://arxiv.org/abs/2505.21864 — hand exoskeleton + inpainting closes the kinematic gap; code available.
 - **UniDex** (2026) — https://arxiv.org/abs/2603.22264 — universal dexterous 3D VLA from human video; supports human-robot co-training.
-- ⭐ **DexMachina** — https://arxiv.org/abs/2510.08475 — *(bumped 2026-06-03)* **functional retargeting** of non-trivial human manipulation onto **dexterous (multi-finger) hands**, via **RL**. Hits a likely **bottleneck for us** — crossing the human→robot-hand gap for *very* dexterous manipulation — and previews an **RL route** we may need if collected human data can't be replayed directly. *(id was listed jointly with DexMan; verify which is which before citing.)*
+- ⭐ **DexMachina** — https://arxiv.org/abs/2505.24853 — *(bumped 2026-06-03; id corrected 2026-06-05)* **functional retargeting** of non-trivial human manipulation onto **dexterous (multi-finger) hands**, via **RL** with a virtual-object-control curriculum. Hits a likely **bottleneck for us** — crossing the human→robot-hand gap for *very* dexterous manipulation — and previews an **RL route** we may need. *(NB: `2510.08475` is a **different** paper — "DexMan" — don't confuse.)*
 
 ### 4 · VLA / co-training / latent-action — browse
 *Pretrain-on-human → finetune-on-robot (sequential / staged):*
@@ -106,8 +106,35 @@ What to extract while reading:
 - **DreamZero** — *(deprioritized 2026-06-04 — see Notes)* world action model; supervised on frame-to-frame transformations rather than explicit actions. Representative of a line competing with VLAs for leveraging diverse pretraining video. Parked: we lean VLA route + DP/ACT first.
 - **Cosmos (NVIDIA)** — *deprioritized.* Skimmed; sits more on the multimodal large model side than the policy / WAM side — less directly relevant for our backbone choice.
 
+### 6 · Dexterous RL & human-skill transfer (from DexMachina's related work, queued 2026-06-05)
+- ★ **Learning to Transfer Human Hand Skills for Robot Manipulations** (Park et al., 2025) —
+  https://arxiv.org/abs/2501.04169 — learns a **joint motion manifold** (human-hand ↔ robot-hand ↔
+  object); synthetic triplets → **functional retargeting** respecting robot-object interaction;
+  **real-world, no sim**. *Relevance: sim-free, data-driven alternative to DexMachina's RL retargeting.*
+- ★ **Dexterous Manipulation from Images: Autonomous Real-World RL via Substep Guidance** (Xu et al.,
+  2022) — https://arxiv.org/abs/2212.09902 — vision-based **real-world** RL on a 4-finger hand; tasks
+  defined by **image examples**; autonomous practice, **no sim, no manual reward engineering**.
+  *Relevance: dexterous RL under our exact no-sim/no-privileged-reward constraint.*
+- **DAPG — Learning Complex Dexterous Manipulation with Deep RL and Demonstrations** (Rajeswaran et
+  al., RSS 2018) — https://arxiv.org/abs/1709.10087 — foundational **RL + demos**: human demos cut
+  sample complexity to ~hours on a 24-DoF hand. *Sim.* *Relevance: the mechanism behind "bootstrap RL
+  with our robot demos."*
+- **VideoDex — Learning Dexterity from Internet Videos** (Shaw, Bahl, Pathak, CoRL 2022) —
+  https://arxiv.org/abs/2212.04498 — extracts visual/action/physical **priors from human video** for a
+  real dexterous robot. *Relevance: human-video → dexterous priors (internet video; lower priority).*
+- ★ **Object-Centric Dexterous Manipulation from Human Motion Data** (Chen et al., 2024) —
+  https://arxiv.org/abs/2411.04005 — **hierarchical**: high-level generative model (human hand mocap)
+  synthesizes **wrist trajectories** to object goals; low-level **RL** drives fingers. **Sim→real,
+  bimanual.** *Relevance: object-centric (functional) + high/low split echoing slow-fast; bimanual
+  sim→real — needs sim.*
+- **ManipTrans: Efficient Dexterous Bimanual Manipulation Transfer via Residual Learning** (Li et al.,
+  CVPR 2025) — https://arxiv.org/abs/2503.21860 — pretrain a generalist **trajectory imitator**, then a
+  **residual module** constrained by interaction dynamics; releases **DexManipNet** (3.3K episodes:
+  pen-capping, bottle-unscrewing). **Sim-trained → sim-to-real** (real bimanual demos, qualitative).
+  **Read 2026-06-05 → see Notes.** *Relevance: residual-on-imitator + contact; not sim-free.*
+
 ### Reference
-- *Unverified — confirm before citing:* DemoBot (2601.01651), DexMan (2510.08475 — id shared w/ DexMachina, now promoted to tier 3; verify attribution), Object-centric 3D Motion Field (2506.04227), Gen2Act (2409.16283).
+- *Unverified — confirm before citing:* DemoBot (2601.01651), DexMan (2510.08475 — a **separate** paper; DexMachina is `2505.24853`. Not yet read), Object-centric 3D Motion Field (2506.04227), Gen2Act (2409.16283).
 - *Source datasets to know:* EgoDex, PH2D, Ego4D/SSv2, Project Aria captures, EgoScale 20K-hr corpus.
 
 ---
@@ -124,6 +151,147 @@ What to extract while reading:
 > - **Force/tactile:** (used? how?)
 > - **Key takeaway:**
 > - **What to try / relevance to us:**
+
+### DexMachina — [link](https://arxiv.org/abs/2505.24853)  *(in progress — method read 2026-06-05)*
+
+- **Core distinction — functional vs. kinematic retargeting:**
+  - *Kinematic:* mimic the **human hand motion** — doable **offline**, no object interaction.
+  - *Functional:* make the **manipulated object follow the same state change** — requires a **learned
+    policy interacting with the object**. Harder, but it's what actually matters for manipulation.
+- **Bottlenecks (dexterous functional retargeting):**
+  1. **High hand DoF** → hard exploration for RL.
+  2. **Contact-rich** → needs stable, precise hand motion.
+  3. **Embodiment gap** → direct retargeting **fails functionally** (motion copied, task not achieved).
+- **Relies heavily on a simulator.** Their RL curriculum needs:
+  1. **Virtual object control** — early on the object is *forced* to follow the desired trajectory, so
+     the hand policy can focus on motion-mimicking without being derailed by early failures.
+  2. **Privileged sim info** (e.g. **contact** detection) feeds the contact reward.
+- **Reward — 4 dense terms** (verified 2026-06-05): `r = λ_task·r_task + λ_imi·r_imi + λ_bc·r_bc +
+  λ_con·r_con` —
+  1. **task** `r_task`: object **pose + articulation** tracks the demo.
+  2. **imitation** `r_imi`: fingertip / hand-link **keypoint** tracking.
+  3. **behavior-cloning** `r_bc`: **joint-angle** tracking of the retargeted joints. *(the term easy to
+     miss — motion is split into keypoint-space `r_imi` **and** joint-space `r_bc`.)*
+  4. **contact** `r_con`: hand-object contact matches the demo (distance-based, validity-checked).
+  *(The **virtual object controller** is a **dynamics / curriculum** mechanism — object has 6+1 virtual
+  PD-controlled joints whose gains **decay** as the policy improves — **not** a reward term.)*
+- **Hybrid action outputs** (verified 2026-06-05): base `Q` = **offline kinematic retargeting** (robot
+  hand ↔ human MANO; replayed in sim to remove penetration). **Wrist (6-DoF) = base `Q` + scaled policy
+  residual**; **fingers = absolute** (policy mapped to full joint range `[ℓ,u]`; `Q` *unused* for
+  fingers). Constrains the action space → better learning efficiency. *(Intuition: wrist gross
+  trajectory is well-retargeted → just refine; fingers need full freedom to find functional contact.)*
+- **Force / tactile:** contact is central (via sim-privileged info). _(detail on full read)_
+- **Our thoughts — how this maps to us** (we have **no sim**, no virtual-object-control, no privileged info):
+  1. *Bootstrap substitute:* our **privilege = robot data on the same task** → could bootstrap the
+     policy better than cold-start RL. Could even ask teleoperators to record **recovery behaviors** in
+     robot data to aid RL.
+  2. *Contact without sim:* explore (a) **infer contact from visual obs** (vision-based RL?),
+     (b) how **real-world RL works design / check rewards**, (c) **our hand hardware signals** — e.g.
+     **per-joint torque** readings (→ ties to [D / force](force-impedance-control/index.md)).
+  3. *Action parameterization for us:* reuse DexMachina's **hybrid** split but **swap the base** —
+     **wrist = IL-policy prediction + RL residual**, fingers = absolute joints. (= residual RL on an
+     **IL base**; cf. DAPG / RL-100.) Promising option to try.
+- **Follow-ups to read (next batch — real-world RL):** **RL-100** (IL-bootstrapped policy that
+  improves during deployment) + **hand / dexterous RL** works. → see HANDOFF.
+- **Key takeaway:** **direct kinematic retargeting fails on dexterous, contact-rich tasks** → this is
+  the core motivation for **functional retargeting via RL** + the virtual-object curriculum. Experiments
+  are light. Their close baseline **ManipTrans** is near our setting (real-world dexterous) → read next.
+- **Status:** **done (2026-06-05).**
+
+### ManipTrans (CVPR 2025) — [link](https://arxiv.org/abs/2503.21860)  *(read 2026-06-05; DexMachina's baseline)*
+
+- **How it achieves dexterous bimanual manipulation — two RL/PPO stages (in sim):**
+  1. **Generalist trajectory imitator** — pretrained on **hand-only** data (hand-motion datasets +
+     synthetic interpolation, **no objects**); imitates human hand motion (wrist 6-DoF + MANO finger
+     keypoints + velocities) on the robot hand. Reward = wrist + finger + smoothness → **mitigates the
+     morphology gap**.
+  2. **Residual module** — learns **Δa on top of the imitator's action** (`a = a_imitator + Δa_residual`),
+     **constrained by interaction dynamics** (contact force, object tracking, gravity/friction).
+  - *Why decompose:* separates **motion imitation** (morphology) from **physics/contact** → shrinks the
+    RL action space → tractable on high-DoF contact-rich tasks. *(Same residual-on-base pattern as
+    DexMachina's hybrid actions and our residual-on-IL idea.)*
+- **Contact/force:** **sim contact force** used in **observation + reward + termination**; real hands add
+  **tactile sensors**. *(Training-time contact is sim-privileged.)*
+- **Sim → real:** trained in **Isaac Gym** (4096 envs, PPO; curriculum gravity 0→on, friction high→normal).
+  **Real deploy** on **2× Realman arms + Inspire Hands (w/ tactile)** via **fingertip-alignment fitting**
+  (12-DoF sim → 6-DoF real). Real results are **qualitative** (toothpaste-cap opening; "more on website")
+  — **no quantitative real-world success rates**; marker/bottle tasks live in the **sim** dataset.
+- **Human data:** MANO from video (OakInk-V2, FAVOR, GRAB, ARCTIC); retarget via **21 manual keypoints**.
+  **DexManipNet**: 3.3K episodes / 1.34M frames / 61 tasks (~600 bimanual).
+- **Speed mismatch:** explicitly **does NOT enforce temporal alignment** — "real robots cannot always
+  operate as quickly as human hands." *(Corroborates our temporal-alignment caveat.)*
+- **Relevance / reality check:** the **residual-on-imitator + contact** structure is directly relevant
+  (matches our residual-on-IL idea). **BUT sim-trained** → its real-world dexterity is **sim-to-real, not
+  sim-free**; like DexMachina it does **not** escape our **no-sim** constraint. Real demos are limited.
+- **Status:** read 2026-06-05.
+
+### DexWild (RSS 2025) — [link](https://arxiv.org/abs/2505.07813)  *(in progress)*
+
+- **Why it's our closest match (so far):** (1) targets **bimanual dexterous** manipulation;
+  (2) their **ideal data distribution = ours** — not expensive teleop, not too-distant YouTube ego
+  video, but **human data performing the *same* tasks** as the sweet spot between accessibility /
+  portability (→ generalization) and quality. They name it **"purpose-collected high-quality human
+  embodiment data"** — a nice descriptive label we may borrow.
+- **Key challenge — accurate 6-DoF hand-pose localization for human data** (systematically analyzed
+  in their prior work; this is one of *our* core open problems too):
+  - **Vision-based hand tracking** — not accurate enough for our needs, esp. for **bimanual
+    coordination**. *(We agree.)*
+  - **IMU-based** — mentioned in related work, but **prone to drift**. *Worth keeping the refs so we
+    know where to look later.*
+  - **DexWild's solution:** **cubical AprilTag markers** mounted on the gloves, localized with
+    **monocular exocentric camera(s)**. ← note as a candidate approach for us.
+- **Action space — relative actions.** Records **relative wrist poses** (no absolute world frame)
+  → **eliminates calibration**. Full action space = **wrist pose + hand-joint angles** *(full method
+  to read tomorrow)*.
+- **Hand action-space alignment — fingertip retargeting** (builds on **DexPilot** [17] & **Robotic
+  Telekinesis** [44]). Human ≠ robot hand kinematically, so they **don't copy joint angles**; instead
+  they **solve for the robot's finger-joint angles whose fingertips match the fingertip positions in
+  the human demo**. (DexPilot matches *relative* fingertip-to-fingertip / fingertip-to-palm vectors →
+  encodes pinch/grasp intent, robust to tracking noise; Telekinesis = a *learned* retargeting net from
+  single-RGB / YouTube hand video.) Net: puts human demo + robot action in a **shared fingertip space**
+  → transferable across the hand gap. *(Imitation-based answer to the human→robot-hand gap; DexMachina
+  = the RL route for the harder case.)*
+- **Closing the visual gap — matched wrist cameras.** Wrist/palm cameras mounted the **same way on
+  the human glove and the robot hand** → **no visual gap** on that input stream.
+- **Visual obs — flag for us.** Appears **palm/wrist-camera only (no head camera)**. Their external
+  tracking cam, *"when carefully positioned,"* can also capture **supplementary environmental
+  context** for robust policies → suggests **aligning the main visual obs still takes effort**.
+  **Our challenge:** we plan **egocentric (head-cam) obs**, so the human↔robot visual gap on the main
+  view will need deliberate attention → see [ledger](decisions-and-caveats.md).
+- **Our critique / open risks:**
+  - **Relative actions may accumulate error** over a rollout. DexWild's *data* is likely fine (poses
+    estimated from exo cameras), but **error accumulation could bite at policy-learning / inference**
+    time — watch.
+  - **No third-view / head camera** limits **environmental context** → likely relies on a
+    **well-designed desktop layout + initial pose** to keep objects in view. We'll probably still want
+    an **egocentric head camera**, so we need to **find works on mitigating the human↔robot visual
+    gap** (→ ledger; queue a targeted B search).
+  - **Speed mismatch — human demos run faster than robot rollouts, and DexWild doesn't address it**
+    (30 Hz capture + action chunking only; no time-normalization / resampling). A **temporal/speed
+    mismatch** we may need to handle for our human data → [ledger](decisions-and-caveats.md).
+- **Bimanual trick — append inter-hand pose to the observation** so the policy can reason about the
+  **relative pose between the two hands**. Cheap; **consider adopting** for our bimanual setup.
+- **Vision encoder:** pretrained **ViT** (not ResNet), initialized from the **"Soup 1M" model**
+  (Dasari et al. 2023, *Data4Robotics* [11]; checkpoint `SOUP_1M_DH`). That ViT is pretrained
+  **MAE-style** on a **~1M-image "soup"** combining standard vision datasets (ImageNet, …) **+ 100
+  Days of Hands (DoH)** — a human-hands dataset (hence `_DH`). Their thesis: **pretraining-data
+  *distribution* > scale**; ViT > ResNet for in-the-wild manip [16]. *Relevance: a **hand-inclusive**
+  pretraining mix likely suits our dexterous task → candidate encoder init for us.*
+- **Backbone:** _(to fill)_
+- **Training schedule:** **co-training** with a **fixed in-batch ratio** `(w_h, w_r)` — no
+  curriculum/staging, uniform from init. **Optimal 1:2 robot:human** (~2× human per batch) → 79.8%
+  in-domain / 75.1% in-the-wild / 62.7% extreme. Datasets: **1,395 robot** vs **9,290 human** demos
+  (5 tasks). *(Concrete mixing ratio — fills the gap GR00T left → ledger.)*
+- **Force / tactile:** _(to fill — does the rig capture any contact signal?)_
+- **Key takeaways (read 2026-06-05):**
+  1. **Tasks aren't very dexterous** — mostly simple grasping (e.g. bottles). So **how to retarget +
+     learn from human data on genuinely dexterous tasks remains open for us** (→ DexMachina next).
+  2. **Human data mainly buys generalization** — to new environments / visual appearances (sensible),
+     which is the headline empirical result.
+  3. **Marker-visibility trick:** palm-cam-only **hides the AprilTags from the visual obs** (tags out
+     of view) — a neat sidestep. **But egocentric cameras *would* see the tags** → a marker-induced
+     human↔robot visual gap; we'd likely need **inpainting** (well-studied) to remove them. → [ledger](decisions-and-caveats.md).
+- **Status:** **done (2026-06-05).** Next: DexMachina.
 
 ### DreamZero — World Action Models are Zero-shot Policies (2026) — [link](https://arxiv.org/abs/2602.15922)  *(parked 2026-06-04 — deprioritized; see decision below)*
 
