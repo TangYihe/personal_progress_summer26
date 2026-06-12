@@ -1,6 +1,6 @@
 # Force & impedance control
 
-> Workstream **D** (background knowledge), folder index. ← back to [overview](../../README.md).
+> Workstream **D** (background knowledge), folder index. ← back to [overview](../../../README.md).
 >
 > Last updated: 2026-06-03
 
