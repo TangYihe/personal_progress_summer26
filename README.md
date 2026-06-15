@@ -37,6 +37,7 @@ Status legend: 🟢 unblocked now · 🟡 needs data/compute · ⚪ if time
 | B | **Mixed-data literature survey** — how recent work does human (no-robot) + robot teleop training: backbone · action head · training schedule. Produce my own notes + a list of options to try. ([lit survey](notes/survey/mixed-training.md) · [decisions index](notes/decisions-and-caveats.md) · [human data](notes/design/human-data.md) · [RL options](notes/design/rl-finetuning.md) · [force options](notes/design/force-feedback.md)) | 🟢 |
 | D | **Background reading** — force/impedance control, incl. building intuition + whether to put force into the policy ([notes](notes/survey/force-impedance-control/index.md)); ⚪ large-scale/multi-GPU training; ⚪ Physical Intelligence series + RL post-training. | 🟢 / ⚪ |
 | A | **Data-quality validation** — replay success-rate sanity check (cheap, on real robot) → then DP / ACT to validate data quality. | 🟡 |
+| E | **Codebase investigation** — understand `we-teleop/` implementation (data schema, ACT/DP training pipeline, replay tooling). ([code-structure](notes/implementation/code-structure.md)) | 🟢 |
 
 **Sequencing:** do **C first** (it gates training/iteration) → **B** (highest-leverage prep
 while waiting on data) → **D reading** in parallel. Once data exists: **A** (replay → DP/ACT).
@@ -75,6 +76,15 @@ while waiting on data) → **D reading** in parallel. Once data exists: **A** (r
 ## Milestones / Progress Log
 
 Concise, dated, newest first. Big moments only — session detail lives in HANDOFF.
+
+- **2026-06-15** — E (codebase investigation): fully mapped `~/we-teleop/`. Three notes written:
+  [code-structure](notes/implementation/code-structure.md) (repo layout, module map, training
+  pipeline), [data-schema](notes/implementation/data-schema.md) (Parquet schema, force fields,
+  action representation, sync model), [labmate-sync](notes/implementation/labmate-sync-questions.md)
+  (7-topic prep doc for 师弟 sync). Key findings: τ_ext confirmed natively recorded for arms
+  (resolves force-feedback.md §4 action item); two action levels in every recording (joint + EE);
+  ACT/DP are original submodules with adapter; single head cam only; four control modes including
+  force_impedance. Hardware open questions (wrist F/T, replay mode, DOF coverage) queued for sync.
 
 - **2026-06-11** — D (force survey) + VLA architecture. Read **Ego-Pi (`2606.08107`)**
   (PI dexterous humanoid, π₀.₅ backbone, egocentric human co-training): limited relevance to
