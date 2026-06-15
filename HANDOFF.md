@@ -3,7 +3,7 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: 2026-06-15
+> Last session: 2026-06-15 (updated mid-session 2026-06-15 for team sync prep)
 
 ---
 
@@ -49,12 +49,27 @@ Pending: labmate sync meeting to answer open hardware/dev questions.
 
 ---
 
+## In progress right now (2026-06-15, switching laptops)
+
+**Team sync slides for 2026-06-16 morning.** Outline drafted at
+[notes/presentations/team-sync-2026-06-16.md](notes/presentations/team-sync-2026-06-16.md).
+
+- 5-slide structure, ~10-min slot, speaker-driven, higher-level audience.
+- **§4 (next concrete steps) is a placeholder — needs to be filled before the meeting.**
+- Hardware status update needs to include outcome of today's online communication about
+  robot delivery (still pending as of 2026-06-15).
+- May also want to add specific task demo videos for Slide 2 (DexMachina / ManipTrans).
+
+---
+
 ## Pick up next
 
-**1. Labmate sync meeting** — highest priority gate.
-Prep doc ready at [labmate-sync-questions.md](notes/implementation/labmate-sync-questions.md).
-After meeting: fill in answers, update data-schema.md §force fields and force-feedback.md §4
-with confirmed sensor availability, unlock any blocked design decisions.
+**1. Labmate sync (partial — follow-up needed).**
+[labmate-sync-questions.md](notes/implementation/labmate-sync-questions.md) updated with partial answers.
+Resolved: impedance as primary control mode; force_impedance is a "push + distance" primitive
+(not hybrid position/force — less useful than expected); end-to-end pipeline validated on pick task;
+hand not yet integrated; wrist cameras planned, will be fisheye.
+Still open: torso/head DOF coverage, flange F/T sensor, τ_ext bias, dev plan, deployment timeline.
 
 **2. FILIC (`2509.17053`)** — read when ready. Key finding already captured (EEF wrench via
 Jacobian inversion +10–17 pp); read for deeper understanding of dual-loop IL + impedance.
@@ -74,7 +89,7 @@ experience). Variable impedance (`2603.14068`) likewise.
 - **τ_ext confirmed available** for arm joints (resolved action item from §4 force-feedback.md).
   Still open: τ_ext calibration/bias behavior (Q6.6 in sync doc).
 - **flange_force** (wrist F/T): column exists but hardware availability unknown → Q6.5.
-- **Replay on real robot:** unclear if currently supported → Q3.1 in sync doc.
+- **Replay on real robot:** confirmed working (Q3.1 resolved). Labmates validated end-to-end on pick task.
 - **Hand DOFs:** not in training pipeline → needs ownership decision → Q4.2 in sync doc.
 - GPU: awaiting colleague's case-clearance + PSU-label report.
 - Large-scale training-resource details from advisor (~2026-06-04/05 expected — overdue, follow up).

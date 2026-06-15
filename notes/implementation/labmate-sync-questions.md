@@ -4,7 +4,7 @@
 > Covers what we found from code inspection, what's already documented, and what needs syncing.
 > ← back to [code-structure](code-structure.md) · [data-schema](data-schema.md)
 >
-> Investigation date: 2026-06-15 · Meeting: TBD · Answers: TBD
+> Investigation date: 2026-06-15 · Partial sync: 2026-06-15 · Remaining questions: open
 
 ---
 
@@ -26,7 +26,8 @@ data schema detail in [data-schema.md](data-schema.md). Summary of what's confir
   input, never its own rollout. No real-robot closed-loop eval available yet (`plan` command
   raises `NotImplementedError`).
 - **Control modes confirmed in driver:** `position`, `impedance` (joint spring-damper),
-  `imp_cart` (Cartesian spring-damper), `force_impedance` (hybrid position + contact force).
+  `imp_cart` (Cartesian spring-damper), `force_impedance` (force direction + max travel distance
+  — **not** hybrid position/force as initially assumed; see §6 answers).
 - **Force signals confirmed available:** τ_ext (`joint_external_torques`) for arm joints only
   (torso/head return None). `flange_force` column exists; actual availability depends on
   whether the wrist F/T sensor is fitted — need hardware confirmation.
@@ -53,6 +54,12 @@ separate dataset? Who drives the schema change?
 final configuration, or will placement / resolution change?
 
 **Answers:**
+- **Q1.1 (partial):** Wrist cameras will be set up later. Not on the immediate roadmap but planned.
+- **Q1.3:** Currently head camera only — confirmed. Wrist cameras coming later.
+- **Camera type note:** The wrist cameras will be **fisheye**. This has design implications for
+  training: fisheye images either need to be rectified before use or handled by
+  architectures/augmentations that tolerate the distortion. Need to review how previous works
+  (e.g. DexWild) handle fisheye wrist cameras. Q1.2 (integration path) still open.
 
 ---
 
@@ -95,6 +102,9 @@ robot for success-rate sanity checks) planned, and when? This is our primary wor
 validation step once data arrives.
 
 **Answers:**
+- **Q3.1 / Q3.2 (resolved):** Real-robot policy replay is working. Labmates have verified
+  end-to-end: collected a simple pick task dataset, trained ACT (overfit), and replayed
+  on the real robot — no issues. The basic pipeline (record → train → replay) is validated.
 
 ---
 
@@ -124,6 +134,10 @@ This simplifies the action space significantly for early IL experiments.
 (tabletop, hands)? Does the head currently track the task during teleop?
 
 **Answers:**
+- **Q4.1 / Q4.2 (partial):** Hand teleop integration is **not yet complete** — hand is
+  not in current data collection or action space. The validated pick task dataset and policy
+  do not include hand DOFs. Timeline for hand integration is open.
+- Q4.1 (torso/head coverage), Q4.3, Q4.4 still open.
 
 ---
 
@@ -166,21 +180,23 @@ Four control modes confirmed in `GentoV0404Driver`:
 | `position` | `switch_to_position_mode` | Pure position control — drives to target, fights external forces |
 | `impedance` | `switch_to_imp_joint_mode` | Joint-space spring-damper: τ = Kp×error + Kd×vel_error. Compliant to external forces. Current gains: Kp=(3,3,3,3,0.5,0.5,0.5), Kd=(0.6,0.2,0.2,0.16,0,0,0) |
 | `imp_cart` | `switch_to_imp_cart_mode` | Cartesian-space spring-damper. Kp/Kd in 7D (x,y,z,rx,ry,rz,nullspace). Allows per-axis compliance tuning. |
-| `force_impedance` | `switch_to_imp_force_mode` | Hybrid position + contact force: sends both joint position target (per cycle) and a force direction + magnitude. Limits: ±10 N, 30 mm, 1 Nm, 10 deg. |
+| `force_impedance` | `switch_to_imp_force_mode` | Specify a force direction + magnitude + max travel distance. Robot moves in that direction applying the specified force, stopping at the distance limit. No simultaneous pose target. |
 
 **Key distinction clarified:**
 - `impedance` and `imp_cart` both still track a position target, but compliantly — external
   forces deflect the robot proportionally to Kp (lower = more compliant).
-- `force_impedance` is hybrid position/force control: position target + a desired contact
-  force in a specified direction, set each cycle via `runtime_set_force_ctrl`.
+- `force_impedance` (corrected): **not** hybrid position/force control as initially assumed.
+  Input is (force direction, magnitude, max travel distance) — the robot moves in the specified
+  direction with the specified force, up to the distance limit. No concurrent pose target.
+  This is closer to a "push until contact" primitive than full hybrid control.
 
 **To sync:**
 
 **Q6.1** Which control mode is used during normal teleoperation — `impedance` or `position`?
 Is it configurable per launch profile?
 
-**Q6.2** Is `force_impedance` mode working and tested on the real robot? Is it exposed
-during teleoperation or only for scripted/diagnostic motions?
+**Q6.2** Is `force_impedance` mode working and tested on the real robot? What exactly are
+its inputs, and is it suitable for our use case?
 
 **Q6.3** Is the commanded force in `force_impedance` mode echoed back anywhere in the
 snapshot? (We see τ_ext is recorded, but not the force setpoint.)
@@ -196,6 +212,15 @@ have wrist F/T sensors, or just one, or neither?
 a session? Matters for using it as a reliable contact signal in training.
 
 **Answers:**
+- **Q6.1 (resolved):** Position control triggers safety protection easily in practice.
+  **Joint impedance (`impedance`) is the chosen control mode going forward.**
+- **Q6.2 (resolved — and corrected):** `force_impedance` mode has been tested. Its actual
+  interface is **(target force direction + magnitude + max travel distance)** — not a
+  simultaneous pose + force target as we initially assumed from the code. Semantically it is
+  a "push in direction X with force Y, stop after Z mm" primitive. This makes it **less
+  suitable for general contact-rich manipulation** (no concurrent pose control); it is more
+  useful for scripted insertion/pressing primitives. We will not rely on it for our IL setup.
+- Q6.3–Q6.6 still open.
 
 ---
 
@@ -212,11 +237,26 @@ host IK state and robot sensor state are aligned in recorded data.
 
 ---
 
-## After the meeting
+## Status summary (2026-06-15 partial sync)
 
-Update:
-- This doc with answers
-- [data-schema.md](data-schema.md) §force fields with confirmed sensor availability
-- [code-structure.md](code-structure.md) open threads section
-- [force-feedback.md](../design/force-feedback.md) §4 if flange sensor availability is confirmed
-- [decisions-and-caveats.md](../decisions-and-caveats.md) if any design decisions are unlocked
+**Resolved:**
+- Control mode: joint impedance confirmed as primary. Position mode ruled out (safety trips).
+- `force_impedance` interface clarified: force + distance primitive, not hybrid position/force.
+  Not suitable for our general manipulation use case.
+- End-to-end pipeline validated: record → ACT train → real-robot replay works on a pick task.
+- Hand: not yet integrated into data collection or training. No timeline yet.
+- Wrist cameras: planned but not imminent; will be fisheye when added.
+
+**Still open (need follow-up):**
+- Q1.2: Wrist camera integration path (schema change ownership, format)
+- Q4.1: Which subsystems move in current recordings (torso, head?)
+- Q4.3 / Q4.4: Arm-only config feasibility + head camera coverage
+- Q5.1–Q5.4: Dev plans, repo ownership, deployment timeline
+- Q6.3–Q6.6: force setpoint echo, τ_ext on torso/head, flange F/T sensor fitted?, τ_ext bias
+- Q7.1 / Q7.2: Recording FPS, ZMQ latency
+
+**Downstream updates to make once remaining questions are answered:**
+- [data-schema.md](data-schema.md) §force fields — confirm flange sensor availability
+- [force-feedback.md](../design/force-feedback.md) §4 — update based on confirmed signals
+- [decisions-and-caveats.md](../decisions-and-caveats.md) — unlock any blocked design decisions
+- [code-structure.md](code-structure.md) — close open threads as confirmed
