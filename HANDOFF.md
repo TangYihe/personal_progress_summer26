@@ -3,95 +3,198 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: 2026-06-15 (updated mid-session 2026-06-15 for team sync prep)
+> Last session: 2026-07-15 — planning session, back from the 4-day break. **`git pull` in we-teleop still pending** (labmates had 4+ days to push/rebase).
 
 ---
 
 ## Where we are
 
-**GPU procurement (workstream C):** RTX 4090 still pending colleague's case-clearance + PSU-label
-report. Large-scale training compute from advisor also still awaited (expected ~2026-06-04/05 —
-now overdue; worth following up).
+**Workstation AND Orin both on `master` (Orin synced 07-09 via `sync_luna.sh nvidia@6.6.7.100` — now in CHEATSHEET §0 as a session-start step; ⚠️ always pass the address, script default is another robot).** Master tip includes `dc100cc` — driver emits a fixed **60 Hz snapshot stream**, recorder stores 1:1 (state read internally at 120 Hz). Serials in CHEATSHEET (`R=306735523434`, `L=366239543134`).
 
-**Reading mode:** I read papers; agent assists, verifies, and organizes. Collaborative, paper-by-paper.
+**Colleague's retargeting: sim-tested 07-09 am, GOOD** with one tweak — right middle finger over-stuck → its `d2` 4.0→3.0 in `wuji_right.yaml` (uncommitted). On-robot feel still unverified. **Finetune store still DISABLED** (`~/.we-teleop/wuji_finetune.json.off`) — Test B (store overlay on, watch right-pinky `d1 7.95` suspect) never run; do it before relying on our 07-08 calibration. Debug rules: finger over-sticks → lower its `d2`; tactile gate = min(thumb, finger taxel) — pads must press together.
 
-**Codebase investigation (workstream E):** `~/we-teleop/` fully mapped this session. Notes written.
-Pending: labmate sync meeting to answer open hardware/dev questions.
+**Camera FIXED (07-09): the all-white cam view was a units bug in master's exposure lock.** `_lock_camera_exposure` (Xiawei `296574d`) pins `D405_EXPOSURE_US=10000` with AE off — that's 10 ms on their D405 (µs units) but **1 SECOND on our D455 RGB sensor (100µs units)** → solid white. Local fix `D405_EXPOSURE_US = 100.0` (=10 ms) **VERIFIED on robot — view normal**. Committed on **`wip/d455-exposure-fix-20260709`** (`96cc236`; recovery after any force-push reset: `git cherry-pick 96cc236`). TODO: upstream a `--camera-exposure` flag + tell labmates (not portable across cameras; also gain freezes wherever AE left it). Note: with AE off, one `wait_for_frames timeout` warning at driver start is benign; repeated = USB/cable (D455 mount still taped — check `rs-enumerate-devices` USB type 3.x vs 2.1).
 
----
+**Arm-jitter data: RE-RECORDED WITH CAMERA 07-10 + SENT to labmate** — `rubric-cube-0710__20260710-105655` (6 eps, 94,756 frames @ 60 Hz, camera confirmed) + `lagging_movement_2.zip`; parquets with the labmate for analysis — **follow up on their verdict after the break**. ⚠️ Make sure they know state is 60 Hz sampled — jitter >30 Hz aliases. (07-09 camera-less `teleop-bug1..3` recordings now redundant.) **Labmate 07-09: the 一卡一卡/stationary jitter is a "PICO reading issue"** → see PICO section below. **Operator view verdict 07-10: robot-right/operator-left WORKS — cube teleop a lot better** ✓.
 
-## What was done this session (2026-06-15)
+**Recording keys (verified in code):** `r` start = ramp to init THEN record (skip-ramp if already at reset pose); `s` = save+reset-ramp; `r` mid-recording = discard+reset-ramp. Task must be selected first (`rc`). ⚠️ **Hands do NOT open on reset** — upstream regression still present (reset packet sends last hand pose): drop held objects before `s`. Use `s` even for jitter episodes (failures may get filtered out by the team's tooling).
 
-**Full `~/we-teleop/` codebase investigation.** Three notes written:
+**Torso lock is now config, NOT `--lock-torso`** (labmates 07-09): `ik_preset.joints.torso: false` in `config/teleop/pico_ee_absolute_wuji_hands.yaml` (uncommitted). CHEATSHEET §1 updated. First session: watch torso doesn't sag (driver no longer actively holds it).
 
-- [code-structure.md](notes/implementation/code-structure.md) — overall repo layout, module map,
-  entry points, launch profiles, data layout, training pipeline, open threads.
-- [data-schema.md](notes/implementation/data-schema.md) — detailed Parquet schema: state origin
-  and shape, all force fields with semantics, action representation (two levels: joint-space +
-  EE Cartesian), cross-stream sync model and timestamp columns.
-- [labmate-sync-questions.md](notes/implementation/labmate-sync-questions.md) — 7-topic prep doc
-  for the 师弟 sync meeting (cameras, demo data, replay, action space, dev plans, control modes,
-  supplementary). Includes what we already know from code vs. what needs confirming.
+**`we data rerun` — viewer status (07-10 retest):** native viewer FAILS in robo env (`winit: Failed to load one of xlib's shared libraries` — egl-wayland did NOT fix it). **Browser mode works**: `we data rerun <name> -e N --no-robot-model --browser` then open `http://127.0.0.1:9090/?url=rerun%2Bhttp%3A%2F%2F127.0.0.1%3A9876%2Fproxy` (plain `:9090` = disconnected welcome screen; the serving process must stay running). ⚠️ **Freezes ~10 s into a full episode** (~15k frames + images) — next: `--max-frames` windows, or `--save ep.rrd` + standalone viewer outside robo env, or fix xlib in robo.nix. Venv note: `uv sync --extra operator --extra data-rerun --group dev --group wuji-glove` dropped torch/lerobot — add `--group train-lerobot` back before any `we eval`/`we deploy`. After robo.nix changes, EXIT and re-enter open robo shells (in-place re-eval leaves broken PATH — `No module named mujoco`).
 
-**Key findings from code investigation:**
+**PICO — status update 07-15:**
+1. *Tracking in third-person view still a bit shaky*; hanging the headset over the operator's neck works better. **Teammates suggest switching to Meta Quest** (large code change on their side) — ask progress at the meeting. Interim tip: **reset the PICO controllers (ring button? — verify) before every teleop session.**
+2. *Sleep bug* (unchanged, moot if Quest happens): adb settings + USB-C power don't prevent rack sleep; interim = nudge every few minutes (`Space`, settle, `Enter` after).
+3. *Stationarity A/B* (rack tilted vs straightened) — deprioritized 07-15 pending the Quest answer; details in [week-2026-07-06](notes/weekly-notes/week-2026-07-06.md) TODO #3.
 
-- τ_ext (`joint_external_torque`) confirmed natively recorded for both arms → answers
-  force-feedback.md §4 action item; directly usable for FACTR/TA-VLA approaches.
-- Force fields: three layers — per-joint τ_ext/effort, arm-base 6D wrench + IMU, wrist
-  flange 6D wrench. `flange_force` column exists; hardware availability unconfirmed.
-- Action space has two levels in every recording: joint-space (`action.joint_qpos`) and
-  Cartesian (`action.ik_target.*`). Hand DOFs recorded but not in training pipeline.
-- ACT/DP are original unmodified submodules; connected via Parquet→HDF5 adapter with z-score
-  normalization. Open-loop eval runs on recorded data in MuJoCo only (no real-robot eval yet).
-- Single head camera only (RealSense D405, 640×480). Wrist cameras not integrated.
-- Four robot control modes: position, impedance (joint), imp_cart (Cartesian), force_impedance
-  (hybrid position + contact force). force_impedance availability on real robot unconfirmed.
+**Left glove tactile sensor still FAULTY (hardware)** — vendor contacted 07-08, no reply yet; follow up. Until replaced, left press-pinch/pressure can't work (distance-gate retargeting unaffected).
+
+**Glove cabling (07-10): running WITHOUT the extension cable** — passive USB3 extension caused `-EPROTO`/-71 storms on the right adapter (details + diagnostic recipe in weekly notes 07-10). Proper fix later: active repeater / powered hub / ethernet-side extension. If a glove ever shows carrier UP but ping dead + frozen RX counters → glove processor hung → power-cycle the glove.
+
+**Operator view: robot moved to the RIGHT (07-09 evening)** — replaces the seat-move idea; judge next session. Bimanual ergonomic conflict (seeing right hand's fingers = tiring left-arm pose) still open. Getting more teleop tasks/objects from Eden (in progress 07-09).
+
+Note: local snapshot branches: **`wip/d455-exposure-fix-20260709`** (`96cc236`, the exposure-units fix — cherry-pick after any reset), `wip/pre-master-switch-20260708` (07-08 pinch-tuning state), `wip/pre-multiproc-20260706` (pre-branch-switch state incl. driver.py gain overrides + old pinch yamls) and `wip/live-deploy-state-ood` (pre-refactor, never delete). Retargeting commits (`83b422e` etc.) are still NOT on master — they also live on active `feat/wuji-hand-v2`; 11 multiprocessing-branch commits not merged. Ask labmates about the merge plan.
+
+**Uncommitted working-tree changes (07-09):** `driver.py` (exposure 100), `config/teleop/pico_ee_absolute_wuji_hands.yaml` (torso false), `config/inputs/retargeting/wuji_right.yaml` (middle d2 3.0), + 4 `act_pick_toy*.yaml` staged. All flow to the Orin via `sync_luna.sh` (mirrors working tree).
+
+**Weekly notes:** [notes/weekly-notes/week-2026-07-13.md](notes/weekly-notes/week-2026-07-13.md) (prev: [week-2026-07-06.md](notes/weekly-notes/week-2026-07-06.md))
 
 ---
 
-## In progress right now (2026-06-15, switching laptops)
+## What was done (2026-07-02, evening session — OOD bug resolved, upstream integrated)
 
-**Team sync slides for 2026-06-16 morning.** Outline drafted at
-[notes/presentations/team-sync-2026-06-16.md](notes/presentations/team-sync-2026-06-16.md).
-
-- 5-slide structure, ~10-min slot, speaker-driven, higher-level audience.
-- **§4 (next concrete steps) is a placeholder — needs to be filled before the meeting.**
-- Hardware status update needs to include outcome of today's online communication about
-  robot delivery (still pending as of 2026-06-15).
-- May also want to add specific task demo videos for Slide 2 (DexMachina / ManipTrans).
+- **State-OOD root cause revised + confirmed**: training state dims 16–24 = **left arm (16–22) + head (23–24)** on the plain 25-joint model (near-constant: right-hand-only task, left arm parked at ±1.57 home). Old deploy built the state on the hand-augmented model → fingers leaked into 16–24 AND real left-arm/head feedback landed at addresses 36–44, outside the first-25 trim. Full detail in the bug note's RESOLUTION section.
+- **Upstream integrated (force-pushed/rebased history!)**: local master `reset --hard` to `origin/master` (`6536c22`). All pre-refactor local changes preserved on branch **`wip/live-deploy-state-ood`** (`a96f840`). Restored from it (upstream didn't touch these): pinch-calibration yamls, `act_pick_toy*.yaml` policy configs, diagnostics script.
+- **Upstream rewrote deploy** → runs inside TeleopApp on the plain model (same code path as recording) → **fixes the OOD bug structurally**.
+- **LIVE DEPLOY VERIFIED** ✓ — `we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 060000` with the old driver on the Orin: no lurch, behavior close to demos, full episodes clean. Wire compat old-driver ↔ new-workstation checked (new `state` snapshot command fails gracefully; command path unchanged).
 
 ---
 
-## Pick up next
+## What was done (2026-07-01)
 
-**1. Labmate sync (partial — follow-up needed).**
-[labmate-sync-questions.md](notes/implementation/labmate-sync-questions.md) updated with partial answers.
-Resolved: impedance as primary control mode; force_impedance is a "push + distance" primitive
-(not hybrid position/force — less useful than expected); end-to-end pipeline validated on pick task;
-hand not yet integrated; wrist cameras planned, will be fisheye.
-Still open: torso/head DOF coverage, flange F/T sensor, τ_ext bias, dev plan, deployment timeline.
+- **`we train` fixed + ACT training running** — two bugs in `2ea54a4` (the QoL training commit):
+  1. LeRobot's output dir collided with `we train`'s manifest files → fixed upstream with `LEROBOT_OUTPUT_SUBDIR = "train"`
+  2. `_validate_loss` called `policy.eval()` → ACT's VAE encoder returned `None` → KL loss crashed. Labmate had local fix; pushed after we reported. Fix: check `policy.config.use_vae` before switching mode.
+  - Both fixes pulled via `git pull` (75da37e → 560e76f). Training now running cleanly.
 
-**2. FILIC (`2509.17053`)** — read when ready. Key finding already captured (EEF wrench via
-Jacobian inversion +10–17 pp); read for deeper understanding of dual-loop IL + impedance.
+- **Upstream pull — notable driver.py changes:**
+  - `"impedance"` control mode renamed to `"pd"` — `"impedance"` kept as deprecated alias, existing commands still work
+  - `alpha` default: `0.95` (was `0.9`)
+  - `DEFAULT_OPERATOR_ADDRESS`: `6.6.7.200` (was `192.168.1.196`)
 
-**3. Slow-fast policy papers:**
-- Slow-fast trio (`2605.27886`)
-- ImplicitRDP (`2512.10946`)
-Goal: fill in §8 (slow-fast structure) of [design/force-feedback.md](notes/design/force-feedback.md).
-
-**4. Adaptive compliance (`2410.09309`)** — deferred (theory-heavy; revisit after real-robot
-experience). Variable impedance (`2603.14068`) likewise.
+- **Ethernet topology planned** — current shared office WiFi causes teleop jitter/"jumping". Plan confirmed: wall → router → switch → workstation + robot (ethernet); PICO → switch via USB-C ethernet adapter. Not yet executed.
 
 ---
+
+## What was done (2026-06-30)
+
+- **Torso startup error fixed** — labmate updated x86 onboard software; no longer recurring.
+- **Full pipeline verified end-to-end**: D455 stream (serial `419222302053`, used for data collection), D435i (serial `349622073307`) also verified, right Wuji glove + hand, recording flow (R/S keys).
+- **First data collection** ✓ — ~50 demos pick toy + put in bin. Arm motion unstable — to address.
+
+---
+
+## Canonical teleop commands
+
+> ⚠️ **Superseded 2026-07-06 — dual-hand + `--lock-torso` is now canonical; see [CHEATSHEET.md](CHEATSHEET.md) §1–§4** (single source of truth for commands). Kept below for reference only.
+
+**Orin** (`~/project26/we-teleop`, `robo shell --profile tianji-driver`):
+```bash
+# Reset robot to safe pose first:
+we driver --reset-once --acc 20 --control-mode pd --auto-reset-errors
+
+# Then start driver (new terminal) — OLD single-hand version, see CHEATSHEET for current dual-hand:
+export WUJI_RIGHT_HAND_SERIAL=306735523434
+we driver --operator-address 6.6.7.166 --control-mode pd --auto-reset-errors --enable-wuji-hands --wuji-hand-side right --camera-serial 419222302053
+```
+
+**Homing note (from 2026-07-01 deploy testing):** `--reset-once` moves to the operational pose then shuts down → IDLE → **hands droop** (no brake). To home AND hold in PD (no droop), start the persistent driver with **`--move-to-init`** instead of a separate `--reset-once`. Add `--no-enable-camera` when the camera isn't needed (e.g. gt-obs deploy uses recorded obs):
+```bash
+we driver --operator-address 6.6.7.166 --control-mode pd --auto-reset-errors \
+  --enable-wuji-hands --wuji-hand-side right --move-to-init --acc 20 --no-enable-camera
+```
+
+**Workstation** (`~/project26/we-teleop`, `robo shell -p operator`):
+```bash
+source scripts/setup/bootstrap_xrobot_pc_service.sh
+we teleop --profile pico_ee_absolute_wuji_hands --driver-address 6.6.7.100:5559
+```
+Press `Enter` in the teleop window to anchor and start.
+
+**Recording:** `R` = toggle record/start, `S` = save episode as success.
+
+**Note:** `--control-mode impedance` still works as a deprecated alias for `pd`.
+
+---
+
+## Inference / eval commands (as of 2026-07-02 — ALL validated ✓, including live closed-loop)
+
+Run on the **workstation** at a physical display (`robo shell -p operator`). All modes open a MuJoCo viewer → will fail headless (same `xlib` class as the rerun bug).
+
+```bash
+# 1. Open-loop eval — RECORDED obs, sim only, no robot (the "did it learn" check)
+we eval act_pick_toy_0702 --split val       # val/unseen episodes — honest check
+
+# 2. Deploy w/ RECORDED obs through the real deploy stack (no live sensors)
+we deploy act_pick_toy_0702 --gt-obs --dry-run   # print resolved settings only
+we deploy act_pick_toy_0702 --gt-obs             # publishes commands on :5558
+
+# 3. Deploy LIVE — real obs, closed loop, needs driver up on Orin (VALIDATED 2026-07-02)
+we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 060000 --max-frames 2000
+```
+
+**⚠️ Config defaults `deploy.gt_obs: true`** → bare `we deploy <policy>` is RECORDED-obs, not live. Must pass `--live` for the real robot.
+
+**New deploy UX (post-rewrite, `route: TeleopApp`):** starts **paused**. `Enter` = start/resume · `Space` = pause · `Tab` = reset robot to init pose (ramps + holds) + clears policy state. `--max-frames N` now **pauses** (not exits) after N frames — good backstop (~2000 ≈ 20 s at 100 Hz). Episode loop: `Enter` → run → `Space`/auto-pause → `Tab` reset → reposition toy → `Enter`.
+
+**Bonus:** `we deploy --serve-policy` + `--policy-endpoint tcp://...` runs inference as a remote server (decouples GPU from robot machine — relevant to cloud-GPU/intern split).
+
+---
+
+## Pick up next (as of 2026-07-15 — planning session done, work session next)
+
+**Big picture: teleop of the two-step cube-twist task WORKS (vertical two-finger twist → horizontal twist). Next big goal = IL / autonomous execution of it.** Full plan + meeting-prep questions in [week-2026-07-13](notes/weekly-notes/week-2026-07-13.md); focus gets finalized after the team meeting.
+
+0. **`git pull` first** (labmate pushes/rebases over the break; snapshot + `reset --hard` if diverged; exposure fix recoverable via `git cherry-pick 96cc236`). Then `sync_luna.sh nvidia@6.6.7.100`.
+1. **Team meeting** — ask: Quest integration status; is data replay really fixed on the newer branch (which?); who owns the recording data-loss bug (a few seconds lost intermittently); big refactor coming? → then pick our first focus.
+2. **Design the reset-to-grasping-pose change (plan 1.a)** — episodes should start with the left hand already grasping the cube, not the default arms-at-side pose; touches teleop + collection + deploy (train/deploy start-pose match). Sketch options before discussing with team. Related: hands do NOT open on `Tab`/`s` reset (upstream regression) — the redesign must decide hand state at reset anyway.
+3. **Labmate's verdict on the jitter parquets** (sent 07-10, `rubric-cube-0710__*`) — follow up; confirm they know state is 60 Hz sampled (>30 Hz aliases).
+4. **Test B of finetune store** (`mv ~/.we-teleop/wuji_finetune.json.off` → on, rerun sim; watch right-pinky `d1 7.95` suspect) + on-robot feel of colleague retargeting incl. our middle `d2: 3.0`.
+5. **Exposure fix follow-ups**: upstream a `--camera-exposure` flag (D405 µs vs D455 100µs-units — tell labmates); optionally pin `rs.option.gain` too.
+6. **Left glove tactile sensor** — vendor still silent; follow up on replacement.
+7. **Lower the default torso pose** — may fold into the 1.a reset-pose redesign.
+8. **Data replay** — pull the newer branch teammates say fixes it, retest before trying our `--max-frames`/`.rrd` workarounds. Bimanual-ergonomics thinking still open. Glove extension proper fix when reach needed. RL-for-dexterous-manipulation reading runs in parallel on the other laptop (notes repo now pushed each session).
+
+**2026-07-07 session summary:** operator trained (pm); cube single-steps good, bimanual hard (ergonomic conflict, open); pinch over-sensitivity root-caused to `calibrate_wuji_pinch.py` degenerate thresholds → reverted to defaults (verified better); tactile monitor diag script added; PICO sleep NOT fixed by white-paper tape (psensor confirmed fooled — deeper cause TBD) and NOT network.
+
+## Pick up next (older list)
+
+0. **Report to labmates / Friday meeting**: full pipeline works end-to-end; state-OOD bug root cause + resolution (bug note has the write-up). Mention the upstream deploy rewrite fixed it and our diagnosis independently confirmed why.
+1. ~~Port the ARM_TOOL_DYNA conditional fix before Orin update~~ — **OBSOLETE (2026-07-03): TIANJI firmware/SDK update fixed the underlying controller bug** (it was TIANJI-side all along; non-zero dyna with no hand no longer corrupts mode switching). And since our hand is always mounted now, non-zero kine/dyna offsets are always correct — upstream's unconditional `ARM_TOOL_DYNA` is fine as-is. No port needed before syncing the Orin.
+2. **New control params: adopted 2026-07-03, shaking LARGELY MITIGATED** ✓ — Orin synced to new master (`sync_luna.sh`); driver hold test confirms new gains (KP 10 flat, KD (0.6,0.2,0.2,0.16,0,0,0)) mostly fix the arm shaking. Use `--control-mode pd` (not `impedance`) everywhere now. Future data collection happens on the new gains → no train/deploy mismatch going forward.
+3. ~~More eval episodes + success rate on pick-toy; record videos~~ — DONE 2026-07-03 (multiple episodes with object-position variation + videos).
+4. **Right-hand pinch over-sensitive** — reproduced in sim 2026-07-03 (`sim_glove_to_hand.py --side right`, kinematic mode added + pushed — no robot needed). Colleague's new retargeting algorithm **lands Monday morning** — pull + re-test in sim then.
+5. **Left glove** — waiting on replacement (external). #1 blocker for dual-hand.
+6. **`we data rerun` replay bug** — display lockup; investigate (check if the upstream rerun changes fixed it).
+7. **Background board** — ask W or S.
+
+**Still on radar:**
+- PICO wrist calibration (redo once mounts stable)
+- Quest headset setup
+- Wuji hand TIANJI official mount (power/comm routing under discussion)
+- Arm droop (no brake) — awaiting TIANJI response
+- Camera mount proper fix (D455 still taped; live obs verified fine, but fragile)
+
+---
+
+## Local changes vs upstream (2026-07-02 — after master reset to origin)
+
+**Branch `wip/live-deploy-state-ood` (`a96f840`)** = full pre-refactor snapshot (old debug flags, old fixes, configs). Never delete it; recover single files with `git checkout wip/live-deploy-state-ood -- <path>`.
+
+**Restored into working tree (untouched by upstream):** `config/inputs/retargeting/wuji_{left,right}.yaml` (pinch calib), `config/policy/act_pick_toy*.yaml`, `scripts/diagnostics/debug_tianji_arm_mode_switch.py`.
+
+**New local changes (2026-07-03):** `driver.py` — `PD_ARM_KP`/`PD_ARM_KD` env-var overrides for gain testing (uncommitted, synced to Orin; watch for conflicts when pulling — labmates touch this file). `sim_glove_to_hand.py` kinematic mode was committed + pushed (not local).
+
+**New local changes (2026-07-08, all uncommitted):** (1) `third_party/wuji_retargeting_v2_pkg/.../opt/enhanced_analytical.py` — per-finger `d_near_cm`/`d_far_cm` via `_parse_per_finger` (**UNTESTED**; vendor pkg is editable-installed so it's live); (2) `config/inputs/retargeting/wuji_right.yaml` — `d_near_cm: {index: 3.5, middle: 3.0, ring: 3.0, pinky: 3.0}`; (3) `wuji_left.yaml` — `d_near_cm: 4.0`; (4) new `scripts/diagnostics/monitor_wuji_tactile.py` (2026-07-07). Stale `wuji_{left,right}.yaml.bak` from the bad 07-07 calibration still on disk — delete when convenient, do NOT restore from them.
+
+**Old uncommitted fixes — status after the upstream rewrite:**
+1. **init_qpos crash fix** — obsolete for deploy (path deleted); `create_open_loop_runtime` still exists for `we eval`; re-port only if eval hits the IndexError with hands enabled.
+2. **deploy hand-reset fix** — code deleted upstream; NOT re-fixed: new `_send_hardware_reset` still sends the *last* hand pose on reset (`reset()` doesn't clear `hand_targets`). Verify on robot whether the hand opens on `Tab`; re-flag to labmate if it stays pinched.
+3. **teleop hand-reset fix** — same situation as (2) for the `S`-save reset.
+4. **driver.py ARM_TOOL_DYNA fix** — obsolete (2026-07-03): TIANJI firmware/SDK update fixed the controller-side bug; hand always mounted → non-zero dyna always correct.
 
 ## Watch out / open threads
 
-- **τ_ext confirmed available** for arm joints (resolved action item from §4 force-feedback.md).
-  Still open: τ_ext calibration/bias behavior (Q6.6 in sync doc).
-- **flange_force** (wrist F/T): column exists but hardware availability unknown → Q6.5.
-- **Replay on real robot:** confirmed working (Q3.1 resolved). Labmates validated end-to-end on pick task.
-- **Hand DOFs:** not in training pipeline → needs ownership decision → Q4.2 in sync doc.
-- GPU: awaiting colleague's case-clearance + PSU-label report.
-- Large-scale training-resource details from advisor (~2026-06-04/05 expected — overdue, follow up).
-- Design decisions indexed at [decisions-and-caveats.md](notes/decisions-and-caveats.md).
-- After D: Park et al. `2501.04169`; then plan workstream A once data arrives.
+- ~~Workstation and Orin on different we-teleop versions~~ — **SUPERSEDED 2026-07-03: decided to sync Orin to new master** (`sync_luna.sh`). The pick-toy policy was a sanity check only; no need to preserve collection-era deploy dynamics. Old tree still recoverable from `wip/live-deploy-state-ood` if ever needed.
+- **⚠️ Upstream changed driver control params**: `PD_ARM_KP` (24,24,20,16,12,8,8)→(10×7), `PD_ARM_KD` (0.3×7)→(0.6,0.2,0.2,0.16,0,0,0), `alpha` 0.95→0.5. Adopting them changes tracking behavior vs. the training data → plan a re-collect/retrain when switching.
+- **⚠️ `--control-mode impedance` is NO LONGER a pd alias on NEW driver code** — it's now real joint impedance (`switch_to_imp_joint_mode`, no velocity feedforward). Orin's old driver still treats it as alias. Once the Orin updates, use `pd` explicitly everywhere.
+- **⚠️ Upstream history was force-pushed/rebased** — if `git pull` complains about divergence, don't merge; snapshot to a branch and `reset --hard origin/master` (as done 2026-07-02).
+- **Two separate workstation networks:** (1) robot ↔ workstation DIRECT ethernet on `enp14s0` = `6.6.7.166` (`--operator-address 6.6.7.166`, unchanged); (2) PICO ↔ workstation via Xiaomi router on `enp13s0` = `192.168.31.48` (DHCP; lock static). PICO = `192.168.31.110` (wired via USB-C ethernet adapter since 2026-07-06; was `.231` on router WiFi — PICO IP is DHCP and doesn't matter to any config, connection is PICO→WS). Static cmd: `sudo nmcli con mod "有线连接 1" ipv4.method manual ipv4.addresses 192.168.31.48/24 ipv4.gateway "" ipv4.dns ""` (also clears stale `192.168.123.123`). PICO bootstrap: `export TELEOP_XROBOT_HOST_IP=192.168.31.48` before sourcing.
+- **Right Wuji hand serial**: `306735523434` — export before driver launch.
+- **Always pass `--enable-wuji-hands` when hand is physically mounted** — controls dynamics compensation. If omitted with hand mounted, dynamics will be slightly wrong (won't crash).
+- **Right hand only on robot**: `--wuji-hand-side right` — left Wuji hand not yet mounted.
+- **XRobot PC Service**: re-source bootstrap each new shell: `source scripts/setup/bootstrap_xrobot_pc_service.sh`.
+- **Robot SSH credentials**: Orin `nvidia@6.6.7.100` / x86 `root@6.6.7.190` / chassis `sunrise@6.6.7.6`.
+- **`we train` test config**: `config/policy/act_pick_toy_val_test.yaml` — triggers validation at step 1000, useful for quickly testing training pipeline changes.
+- **Start each session with `git pull`** in `~/project26/we-teleop` — labmates push fixes without announcing (and sometimes rebase!).

@@ -5,7 +5,7 @@
 > in `notes/` (created as we reach each milestone). For session-level "where we left off",
 > see [HANDOFF.md](HANDOFF.md). For how this repo is organized, see [AGENTS.md](AGENTS.md).
 >
-> Last updated: 2026-06-11
+> Last updated: 2026-07-15
 
 ---
 
@@ -56,9 +56,8 @@ while waiting on data) → **D reading** in parallel. Once data exists: **A** (r
 
 ## Compute & Resources
 
-- [ ] **Local GPU for prototyping** — *in progress.* PI approved buying a card; leaning
-  **RTX 4090 (24 GB)**. Compatibility check underway (case fit + PSU are the open gates).
-  See [notes/gpu-procurement.md](notes/gpu-procurement.md).
+- [x] **Local GPU for prototyping** — **resolved 2026-06-16.** RTX 4090 workstation operational
+  after several hardware swap iterations. Disk nearly full — cleanup pending.
 - [ ] **Training-GPU source (large-scale)** — *looks resolved in principle.* Advisor says
   resources will be **abundant**; details coming in a couple of days (~2026-06-04/05).
 - [ ] Infra help / collaborator — *TBD*
@@ -76,6 +75,12 @@ while waiting on data) → **D reading** in parallel. Once data exists: **A** (r
 ## Milestones / Progress Log
 
 Concise, dated, newest first. Big moments only — session detail lives in HANDOFF.
+
+- **2026-07-10** — **Dual-arm + dual-hand teleop setup complete; two-step Rubik's-cube twist task teleoperated successfully** (two-finger vertical twist → horizontal twist). Full bimanual stack running: both arms + both Wuji hands + gloves + racked PICO on `master`. Cube-twist teleop went from "barely possible" (07-06) to working end-to-end, via ergonomics (PICO rack, torso lock, operator view robot-right/operator-left, elbow support, operator training) + retargeting fixes (colleague's per-finger config + our middle-finger `d2` tweak). Along the way: camera all-white bug root-caused to a D405-vs-D455 exposure-units mismatch (fixed, verified); jitter episodes recorded with camera and sent to labmate for analysis. See [week-2026-07-06](notes/weekly-notes/week-2026-07-06.md) for full detail. **Next big goal set 07-15: IL / autonomous execution of the cube-twist task** ([plan](notes/weekly-notes/week-2026-07-13.md)).
+
+- **2026-06-30** — **First data collection + ACT training kicked off.** ~50 demos of pick toy + put in bin collected with right Wuji hand on TIANJI robot. D435i camera verified. ACT training running (100k steps, action_horizon=200). Arm motion unstable — to address before next collection. See [week-2026-06-29](notes/weekly-notes/week-2026-06-29.md) for full detail.
+
+- **2026-06-25** — **Teleop pipeline fully operational on real robot.** Arms + right Wuji hand running on TIANJI with position control mode. Key fixes along the way: Gento SDK compiled manually on Orin (bootstrap false-positive), Wuji hand udev rule installed (`70-wuji-hand.rules`), right hand serial corrected (`306735523434`), left arm impedance mode broken → position mode workaround (`--control-mode position --auto-reset-errors`), Wuji glove /32 addressing to avoid subnet routing conflicts, glove IPs made persistent via nmcli, we-teleop switched to `refactor-06-22` branch. Next: robot control accuracy test (circle-drawing script), then data collection. See [week-2026-06-23](notes/weekly-notes/week-2026-06-23.md) for full detail.
 
 - **2026-06-15** — E (codebase investigation): fully mapped `~/we-teleop/`. Three notes written:
   [code-structure](notes/implementation/code-structure.md) (repo layout, module map, training
