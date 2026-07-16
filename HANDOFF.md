@@ -153,6 +153,7 @@ we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 0
 
 **TOMORROW (07-17) cube-collection runbook:**
 0. `git fetch` + check teammates' pushes; Orin: `sync_luna.sh nvidia@6.6.7.100` FROM the integration branch + venv refresh if deps complain (SDK pin changed!); exit/re-enter robo shells; `unset __NV_PRIME_RENDER_OFFLOAD` (operator).
+0.5. **BUILD SINGLE-SIDE TELEOP FIRST** (~2 h, spec ready): profile `sides: [right]` — right arm+hand teleoped, left arm PD-held at task pose, left hand keeps the grasp, left glove/controller not needed. Full spec + file list + open questions in [design/single-side-teleop.md](notes/design/single-side-teleop.md). Data format resolved: record the FULL action vector unchanged (left side = constants — good for IL, schema untouched).
 1. **CAMERA IS BLOCKING**: robot recording requires image modality (wuji profile). Unresolved from 07-15: Orin driver didn't see synced `cameras.yaml`. Now easier: `we camera check`, then `we driver run --auto-reset-errors --camera-name tianji_head_d455 --camera-exposure 100` (new flag; 100 = 10 ms in D455 units).
 2. Gloves: sanity in sim first (`sim_glove_to_hand.py --side right`), pinch thresholds currently index/middle 1.5/2.0 both hands, tactile gates OFF (phantom pressure likely = SDK 2026.7.2 artifact — RE-TEST gates on 2026.6.18, may re-enable).
 3. **Test staged hand reset with gloves** (sim ok) BEFORE robot.
