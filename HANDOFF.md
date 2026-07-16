@@ -132,6 +132,40 @@ we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 0
 
 ---
 
+## 07-16 MORNING UPDATE (mid-session)
+
+- **Left hand REMOUNTED** (mount reprinted) → the 3 right-only patches REVERTED (driver_supervisor sides / hands.py ignore / gento.py zero-tool). Both hands default again.
+- **Pulled upstream** `f1ea07e → 7983e6e` (8 commits, clean ff, no rebase; stash→merge→pop, zero conflicts). All keeper patches intact. Incoming: 1-euro PICO smoothing (labmate on our jitter!), extrapolation toggle (untested), impedance back, wandb eval, `we hands` CLI expansion.
+- **Profile RENAMED**: `pico_ee_absolute_wuji_hands` deleted upstream → `pico_world_wuji_hands`; torso lock now `torso: hold` in it (new schema). Teleop: `scripts/runtime/pico.sh pico_world_wuji_hands --driver-address 6.6.7.100`. Driver: `we driver run --auto-reset-errors --no-camera` (robot address 6.6.7.190 is default now).
+- **⚠️ MuJoCo window BLACK after pull — fix: `unset __NV_PRIME_RENDER_OFFLOAD` in every operator shell** (verified renders fine). Cause: upstream robo.nix sets `nixgl-nvidia` + PRIME offload for a hybrid laptop; our desktop has RTX 4090 as primary display GPU. Local robo.nix patch pending (needs full shell re-entry); add to upstream-report list (3rd works-on-their-machine bug).
+- ⚠️ Orin: `sync_luna.sh nvidia@6.6.7.100` needed before next driver start (deps unchanged → no venv refresh, but exit/re-enter robo shells: flake.lock changed).
+
+**07-16 EVENING — TASK RESET POSE (plan 1.a) BUILT + SIM-VERIFIED ✓. Tomorrow = cube collection.**
+
+**Branch layout (workstation):**
+- **Working tree = `wip/collection-integration-20260716`** = rewrite-0711 tip + labmate's branch (wuji-sdk **2026.6.18** pin + calibration tools) + `feat/task-reset-pose` + our 6 uncommitted local patches. **This is the tree for tomorrow** — sync THIS to the Orin.
+- `rewrite-0711` local = clean at origin (nothing untested on it — merge integration in only after robot validation / team discussion). Feature commits live on `feat/task-reset-pose` (`5e59053`+`37f7706`+`e51e399`) for the eventual upstream PR.
+
+**The feature (all sim-verified 07-16 except staged hands):**
+- `setpose <pose>` capture last live pose (body+hands) → `artifacts/task_poses/<pose>.yaml` + activate · `usepose <pose>` re-activate any session (pose name INDEPENDENT of `rc` dataset name — capture once, collect many datasets) · `home` clear + default reset. `Tab`/`R` ramp to active pose; convergence gate follows it; driver honors the RESET command's action (wire-identical for old flows).
+- **Staged reset** (`e51e399`): pose WITH hand targets = body ramps first → converge → hands commanded → 1.0 s settle (`_RESET_HAND_SETTLE_NS`) → complete. ⚠️ **UNTESTED — needs gloves plugged** (sim test had no hands). Watch for log "reset body converged; commanding captured hand targets"; tune settle if grasp needs >1 s.
+- Sim-verified: setpose/Tab-return/home/usepose + full recording loop (`rc` → `usepose` → `R` auto-records at pose → `S`) in keyboard profile.
+
+**TOMORROW (07-17) cube-collection runbook:**
+0. `git fetch` + check teammates' pushes; Orin: `sync_luna.sh nvidia@6.6.7.100` FROM the integration branch + venv refresh if deps complain (SDK pin changed!); exit/re-enter robo shells; `unset __NV_PRIME_RENDER_OFFLOAD` (operator).
+1. **CAMERA IS BLOCKING**: robot recording requires image modality (wuji profile). Unresolved from 07-15: Orin driver didn't see synced `cameras.yaml`. Now easier: `we camera check`, then `we driver run --auto-reset-errors --camera-name tianji_head_d455 --camera-exposure 100` (new flag; 100 = 10 ms in D455 units).
+2. Gloves: sanity in sim first (`sim_glove_to_hand.py --side right`), pinch thresholds currently index/middle 1.5/2.0 both hands, tactile gates OFF (phantom pressure likely = SDK 2026.7.2 artifact — RE-TEST gates on 2026.6.18, may re-enable).
+3. **Test staged hand reset with gloves** (sim ok) BEFORE robot.
+4. Collection: teleop to left-grasp-cube pose → `setpose rubik_twist` → `rc <dataset>` → episodes: `R` (ramps arms→fingers, auto-records) → task → `S` → re-seat cube → `R` … → `home` at end.
+5. Report to labmates: `test_launch_profiles` broken on clean rewrite-0711 (test expects pico_world `head: hold`, config ships `pico`); share SDK-artifact finding + phantom-pressure story with retargeting owner.
+
+**07-16 afternoon (pinch debugging + fixes → 2 commits READY TO PUSH):**
+- **Pinch over-sensitivity ROOT CAUSE: phantom tactile pressure** (~0.28 at rest, right glove of new pair) firing the `pinch_pressure` press-pinch gate — NOT the distance thresholds. Tactile gates disabled in both hand yamls (`p_on: 1.0 / p_full: 2.0`; keep p_full > p_on or gate locks ON). d1/d2 were a red herring; right hand currently d1=d2=0 (A/B: twisting improved!), restore values in yaml comment.
+- **Ported `sim_glove_to_hand.py`** to rewrite APIs (`scripts/inputs/`, untracked) — MuJoCo hand + per-second `dist_cm`/`pinch_alpha`/`press_gate` printout; single-side network preflight.
+- **Commits PUSHED to rewrite-0711 ✓**: `b81567c` hands open on driver shutdown (+ incident note; verified on robot via log line; ⚠️ held objects drop on driver stop) · `16cd156` `--camera-exposure` flag (labmates' default kept; our D455 = `we driver --camera-exposure 100`; camera.py local patch RETIRED — local diff now 6 files).
+- Teammates pushed: recording overhaul w/ quality markers (likely THE data-loss fix — verify at meeting) + probing experiments; empty branch `fix/hand-retargeting-from-rewrite-0711` — share phantom-pressure findings with them BEFORE they start!
+- Torso shakes: `head: hold` + `torso: hold` now both set in `pico_world_wuji_hands.yaml` (rewrite supports it natively — no develop migration needed).
+
 ## Pick up next (as of 2026-07-15 EVENING — urgent-video day done, 2 videos captured)
 
 **TOMORROW MORNING (07-16), in order:**
@@ -140,7 +174,7 @@ we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 0
 3. Robot state: **rewrite-0711 + 9-file local patch set** ([diff](notes/implementation/rewrite-0711-local-patches-20260715.diff), also in working tree, synced to Orin). Left hand DISMOUNTED (mount melted — photo it, tell labmates/3D-owner, plan reprint in heat-resistant material). Driver: `we driver run --robot-address 6.6.7.190 --auto-reset-errors --no-camera` on Orin; teleop: `we teleop --profile pico_ee_absolute_wuji_hands --driver-address 6.6.7.100`. SSH now passwordless.
 4. **Camera before any data collection**: Orin driver didn't see the synced `cameras.yaml` d455 profile (unresolved); exposure units bug patched locally (round 2 — `daa65c0` re-introduced it).
 5. **When left hand remounts**: revert 3 right-only patches (driver_supervisor sides, hands.py ignore, gento.py zero-tool) — all marked with WARN comments.
-6. **Upstream/report to labmates**: exposure not camera-portable (again) + `--camera-exposure` flag; init-pose gate too strict for hand-loaded wrists (0.5°); hand-command rejection holds whole robot silently (ignore-vs-reject + `--hand-side` flag); ARM_TOOL timeout on tool-less arm is back; sync_luna doesn't refresh the Orin venv.
+6. **Upstream/report to labmates**: exposure not camera-portable (again) + `--camera-exposure` flag; init-pose gate too strict for hand-loaded wrists (0.5°); hand-command rejection holds whole robot silently (ignore-vs-reject + `--hand-side` flag); ARM_TOOL timeout on tool-less arm is back; sync_luna doesn't refresh the Orin venv; **robo.nix graphics not host-portable** (nixgl-nvidia + `__NV_PRIME_RENDER_OFFLOAD=1` hardcoded for a hybrid laptop → black MuJoCo window on our NVIDIA-primary desktop; suggest host-configurable `hostGraphics`).
 
 **Big picture: teleop of the two-step cube-twist task WORKS (vertical two-finger twist → horizontal twist). Next big goal = IL / autonomous execution of it.** Full plan + meeting-prep questions in [week-2026-07-13](notes/weekly-notes/week-2026-07-13.md). Full 07-15 session war story in the week file's daily log.
 
