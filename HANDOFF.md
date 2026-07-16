@@ -132,9 +132,17 @@ we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 0
 
 ---
 
-## Pick up next (as of 2026-07-15 — planning session done, work session next)
+## Pick up next (as of 2026-07-15 EVENING — urgent-video day done, 2 videos captured)
 
-**Big picture: teleop of the two-step cube-twist task WORKS (vertical two-finger twist → horizontal twist). Next big goal = IL / autonomous execution of it.** Full plan + meeting-prep questions in [week-2026-07-13](notes/weekly-notes/week-2026-07-13.md); focus gets finalized after the team meeting.
+**TOMORROW MORNING (07-16), in order:**
+1. **Test the swapped glove pair** — old right glove had degraded signal (weird reconstructed hand). Verify new pair's IPs match `config/inputs/wuji.yaml` (.100/.101 — per-glove static config may differ!), then `we hands check --source wuji` + sim feel (`we teleop --profile pico_ee_absolute_wuji_hands`, no driver = pure sim). ⚠️ **Re-test pinch with stock-ish d2 first (4.0 / middle 3.0)** — today's 2.5/2.2 tuning was against the BAD glove and is probably an artifact.
+2. **Continue harder task videos** (single right arm only — bimanual incl. cube-twist blocked by the melted left mount) → send to supervisor.
+3. Robot state: **rewrite-0711 + 9-file local patch set** ([diff](notes/implementation/rewrite-0711-local-patches-20260715.diff), also in working tree, synced to Orin). Left hand DISMOUNTED (mount melted — photo it, tell labmates/3D-owner, plan reprint in heat-resistant material). Driver: `we driver run --robot-address 6.6.7.190 --auto-reset-errors --no-camera` on Orin; teleop: `we teleop --profile pico_ee_absolute_wuji_hands --driver-address 6.6.7.100`. SSH now passwordless.
+4. **Camera before any data collection**: Orin driver didn't see the synced `cameras.yaml` d455 profile (unresolved); exposure units bug patched locally (round 2 — `daa65c0` re-introduced it).
+5. **When left hand remounts**: revert 3 right-only patches (driver_supervisor sides, hands.py ignore, gento.py zero-tool) — all marked with WARN comments.
+6. **Upstream/report to labmates**: exposure not camera-portable (again) + `--camera-exposure` flag; init-pose gate too strict for hand-loaded wrists (0.5°); hand-command rejection holds whole robot silently (ignore-vs-reject + `--hand-side` flag); ARM_TOOL timeout on tool-less arm is back; sync_luna doesn't refresh the Orin venv.
+
+**Big picture: teleop of the two-step cube-twist task WORKS (vertical two-finger twist → horizontal twist). Next big goal = IL / autonomous execution of it.** Full plan + meeting-prep questions in [week-2026-07-13](notes/weekly-notes/week-2026-07-13.md). Full 07-15 session war story in the week file's daily log.
 
 0. **`git pull` first** (labmate pushes/rebases over the break; snapshot + `reset --hard` if diverged; exposure fix recoverable via `git cherry-pick 96cc236`). Then `sync_luna.sh nvidia@6.6.7.100`.
 1. **Team meeting** — ask: Quest integration status; is data replay really fixed on the newer branch (which?); who owns the recording data-loss bug (a few seconds lost intermittently); big refactor coming? → then pick our first focus.

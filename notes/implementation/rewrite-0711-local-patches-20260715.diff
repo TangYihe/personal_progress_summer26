@@ -1,0 +1,149 @@
+diff --git a/config/actuators/wuji.yaml b/config/actuators/wuji.yaml
+index a301ac4..588fee9 100644
+--- a/config/actuators/wuji.yaml
++++ b/config/actuators/wuji.yaml
+@@ -1,4 +1,4 @@
+ schema_version: 1
+-left_serial: "387E36583533"
+-right_serial: "348234593533"
++left_serial: "366239543134"
++right_serial: "306735523434"
+ low_pass_cutoff_hz: 10.0
+diff --git a/config/cameras.yaml b/config/cameras.yaml
+index fc52348..221e4e8 100644
+--- a/config/cameras.yaml
++++ b/config/cameras.yaml
+@@ -6,6 +6,12 @@ cameras:
+     source: d405
+     resolution: [640, 480]
+     fps: 90
++  # Our head camera is a D455: color maxes at 60 fps for 640x480 (90 fps is
++  # D405-only) -- this is the pre-rewrite working configuration.
++  tianji_head_d455:
++    source: d405
++    resolution: [640, 480]
++    fps: 60
+   quest_passthrough:
+     source: quest
+     resolution: [1280, 1280]
+diff --git a/config/inputs/retargeting/wuji_right.yaml b/config/inputs/retargeting/wuji_right.yaml
+index 516e3cf..13f5743 100644
+--- a/config/inputs/retargeting/wuji_right.yaml
++++ b/config/inputs/retargeting/wuji_right.yaml
+@@ -68,8 +68,8 @@ retarget:
+     ring: [1.056, 1.077, 1.100]
+     pinky: [1.172, 1.266, 1.309]   # OPEN-anchored; shrinks toward pinky_scale_curl.fist when curled
+   pinch_thresholds:
+-    index: { d1: 2.0, d2: 4.0 }
+-    middle: { d1: 2.0, d2: 4.0 }
++    index: { d1: 2.0, d2: 2.5 }   # d2 4.0->3.0->2.5: index over-triggers on rewrite input pipeline (07-15)
++    middle: { d1: 2.0, d2: 2.2 }  # d2 4.0->3.0 (sim A/B 07-09) ->2.5->2.2: still over-triggers on rewrite (07-15)
+     ring: { d1: 2.0, d2: 4.0 }
+     pinky: { d1: 3.59, d2: 5.59 }   # copy from left until right-hand pinch calibrated
+ 
+diff --git a/config/teleop/pico_ee_absolute_wuji_hands.yaml b/config/teleop/pico_ee_absolute_wuji_hands.yaml
+index 598e8c5..e996eee 100644
+--- a/config/teleop/pico_ee_absolute_wuji_hands.yaml
++++ b/config/teleop/pico_ee_absolute_wuji_hands.yaml
+@@ -6,6 +6,6 @@ solver: ee_absolute
+ mobile_base: true
+ base_driver: keyboard
+ enabled_targets: [left_arm, right_arm, headset]
+-enable_torso: true
++enable_torso: false
+ hand_input: wuji_glove
+ required_recording_modalities: [image, left_hand, right_hand]
+diff --git a/src/teleop/interfaces.py b/src/teleop/interfaces.py
+index dac1139..ff848c6 100644
+--- a/src/teleop/interfaces.py
++++ b/src/teleop/interfaces.py
+@@ -9,8 +9,11 @@ from typing import Protocol, TypeAlias
+ 
+ 
+ Vector: TypeAlias = tuple[float, ...]
+-INIT_POSE_TOLERANCE_RAD = math.radians(0.5)
+-INIT_POSE_MAX_VELOCITY_RAD_S = math.radians(1.0)
++# WARN: loosened from upstream (0.5deg / 1.0deg/s). With Wuji hands mounted our
++# wrist joints hold ~0.7deg steady-state PD error under gravity, so the strict
++# gate can never pass on this robot.
++INIT_POSE_TOLERANCE_RAD = math.radians(2.0)
++INIT_POSE_MAX_VELOCITY_RAD_S = math.radians(5.0)
+ 
+ 
+ class ActionSource(StrEnum):
+diff --git a/src/teleop/robots/tianji/camera.py b/src/teleop/robots/tianji/camera.py
+index 6c1ca99..69509ac 100644
+--- a/src/teleop/robots/tianji/camera.py
++++ b/src/teleop/robots/tianji/camera.py
+@@ -166,7 +166,10 @@ class D405Config:
+     jpeg_quality: int = 90
+     # Keep exposure below the frame period so capture latency stays stable at
+     # the configured native rate. Add light before increasing this value.
+-    exposure_us: float = 10_000.0
++    # WARN: our head camera is a D455, whose color sensor takes this option in
++    # 100us units (D405 takes plain us) -> 100 here = 10ms. Do not copy the
++    # D405 value of 10_000.0: on the D455 that means 1 second (solid white).
++    exposure_us: float = 100.0
+ 
+     def __post_init__(self) -> None:
+         if any(
+diff --git a/src/teleop/robots/tianji/gento.py b/src/teleop/robots/tianji/gento.py
+index 0f8abfd..0967eff 100644
+--- a/src/teleop/robots/tianji/gento.py
++++ b/src/teleop/robots/tianji/gento.py
+@@ -321,11 +321,18 @@ class GentoRobotSession:
+             if name in self._enabled_sections
+         )
+         for arm in arms:
++            # WARN: left hand dismounted 07-15 (mount melted). Non-zero tool
++            # dynamics on an arm with no tool makes its controller's PD mode
++            # switch time out, so the left arm gets all-zero tool config.
++            # Drop this special case once the left hand is remounted.
++            no_tool = arm == objects.OBJ_ARM0
+             self._check(
+                 self._robot.runtime_set_tool_kd(
+                     arm,
+                     ARM_TOOL_KINEMATICS,
+-                    ARM_TOOL_DYNAMICS,
++                    tuple(0.0 for _ in ARM_TOOL_DYNAMICS)
++                    if no_tool
++                    else ARM_TOOL_DYNAMICS,
+                 ),
+                 "arm tool configuration",
+             )
+diff --git a/src/teleop/robots/tianji/hands.py b/src/teleop/robots/tianji/hands.py
+index 8e57126..abcd9c1 100644
+--- a/src/teleop/robots/tianji/hands.py
++++ b/src/teleop/robots/tianji/hands.py
+@@ -152,7 +152,12 @@ class WujiHandActuator:
+             if value is None:
+                 continue
+             if side not in self._controllers:
+-                return f"{side} hand command has no actuator"
++                # WARN: right-only mode (07-15, left mount melted): the
++                # operator still streams left-hand targets from the glove.
++                # Ignore targets for unmounted sides instead of rejecting the
++                # whole command (which silently holds the entire robot).
++                # Restore the hard error once both hands are mounted again.
++                continue
+             if len(value) != 20 or any(not math.isfinite(item) for item in value):
+                 return f"{side} Wuji target must contain 20 finite values"
+             lower, upper = self._limits[side]
+diff --git a/src/teleop/runtime/driver_supervisor.py b/src/teleop/runtime/driver_supervisor.py
+index 354ef77..9ac70ad 100644
+--- a/src/teleop/runtime/driver_supervisor.py
++++ b/src/teleop/runtime/driver_supervisor.py
+@@ -207,7 +207,12 @@ def _run_hardware(
+         runtime = load_runtime_config(root)
+         robot = load_tianji_model(root)
+         hands = (
+-            WujiHandActuator(load_wuji_hand_config(root / "actuators" / "wuji.yaml"))
++            # WARN: right-only since 07-15 — left hand mount broke (melted);
++            # left hand is dismounted. Restore sides default once remounted.
++            WujiHandActuator(
++                load_wuji_hand_config(root / "actuators" / "wuji.yaml"),
++                sides=("right",),
++            )
+             if config.hands
+             else None
+         )
