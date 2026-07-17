@@ -3,7 +3,38 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: 2026-07-15 — planning session, back from the 4-day break. **`git pull` in we-teleop still pending** (labmates had 4+ days to push/rebase).
+> Last session: **2026-07-17 (week closed)** — collection pipeline built + robot-validated,
+> then BLOCKED by two root-caused bugs, both reported to labmates with evidence.
+
+---
+
+## PICK UP NEXT (as of 2026-07-17 evening — start here)
+
+1. **HR coordination (OVERDUE — do before anything technical):** message HR colleagues to
+   assign + schedule operator(s) for the **07-25/26 on-site demo sessions** and recurring
+   slots after. People need to block their weekend.
+2. **rtprio experiment on the Orin** (Issue 1 candidate fix, 5 min, no operator needed):
+   `echo 'nvidia - rtprio 20' | sudo tee /etc/security/limits.d/99-we-teleop-rtprio.conf`
+   → log out/in → restart driver → startup line should say `policy=SCHED_FIFO` (not the
+   `SCHED_FIFO unavailable` warning). Then re-test: still episode + moving episode; watch
+   for `interpolation lookahead rejected` / forced pauses. Report outcome to driver owner.
+3. **Check labmates' responses to the two bug reports**
+   ([notes/issues/2026-07-17-shakedown-issues.md](notes/issues/2026-07-17-shakedown-issues.md)):
+   (1) retarget stall on finger movement = COLLECTION BLOCKER, retargeting owner;
+   (2) driver playout faults + unintended movement (⚠️ safety), driver owner. Pull their
+   fixes when pushed (expect rewrite-0711), re-run the finger-movement repro + a 5-episode
+   collection smoke before trusting it.
+4. **Then: real cube-twist collection** (pipeline is otherwise READY): driver w/ camera
+   serial + exposure → `pico_world_wuji_hands` → real grasp → `setpose rubik_twist` →
+   `pico_world_wuji_right` → `usepose` → `rc <dataset>` → `R`/`S` loop (CHEATSHEET §4).
+   Verify first parquet (50 Hz spacing, left-hand grasp constants, D455 frames).
+5. Standing: notes repo committed — **push it yourself** if not yet done; jitter-parquet
+   verdict follow-up; 50 Hz 一卡一卡 feel verdict for the labmate once teleop is usable.
+
+**Tree state:** workstation + Orin on `wip/collection-integration-20260717` (= origin
+rewrite-0711 `dfddafb` + our 7 commits + backup-file removal), Orin venv refreshed.
+Suite: 466 passed / 4 known fails (2 upstream, 2 init-gate locals). Saved task pose
+`rubik_test` (throwaway); capture a real `rubik_twist` before collecting.
 
 ---
 
@@ -139,6 +170,16 @@ we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 0
 - **Profile RENAMED**: `pico_ee_absolute_wuji_hands` deleted upstream → `pico_world_wuji_hands`; torso lock now `torso: hold` in it (new schema). Teleop: `scripts/runtime/pico.sh pico_world_wuji_hands --driver-address 6.6.7.100`. Driver: `we driver run --auto-reset-errors --no-camera` (robot address 6.6.7.190 is default now).
 - **⚠️ MuJoCo window BLACK after pull — fix: `unset __NV_PRIME_RENDER_OFFLOAD` in every operator shell** (verified renders fine). Cause: upstream robo.nix sets `nixgl-nvidia` + PRIME offload for a hybrid laptop; our desktop has RTX 4090 as primary display GPU. Local robo.nix patch pending (needs full shell re-entry); add to upstream-report list (3rd works-on-their-machine bug).
 - ⚠️ Orin: `sync_luna.sh nvidia@6.6.7.100` needed before next driver start (deps unchanged → no venv refresh, but exit/re-enter robo shells: flake.lock changed).
+
+**07-17 AFTERNOON — REBASED ONTO TEAMMATES' NEW LOW-LEVEL WORK. Working tree = `wip/collection-integration-20260717`.**
+
+- **New base**: `origin/rewrite-0711` @ `dfddafb` — control 60→50 Hz / driver 100 Hz (1:1 Gento servo pairing, their fix for a measured 10–35 Hz command-rate beat = likely our 一卡一卡), arm accel 30→60, PICO resample/smoothing rework + hand-EE smoothing, Orin desched stutter fix, wuji-sdk==2026.6.18 pinned UPSTREAM (labmate branch merged — our SDK-pin layer dropped), `driver_address: 6.6.7.100` default in ALL profiles.
+- **Our commits cherry-picked on top (7)**: task-reset-pose ×3 + single-side teleop + camera-check `--exposure` + finger ramp + local-patch snapshot. Only 2 trivial conflicts. Plus: removed upstream's accidentally committed merge-backup test files (broke ruff/pytest on their clean tip) + gave our profile the `driver_address` default.
+- **Suite: 466 passed; 4 known fails** — 2 upstream (`pico_world head: pico` contract test; JPEG-quality test not updated for `5cc9d04`'s 60) + our 2 init-gate locals. Ruff clean. Supervisor smoke (local sim) green.
+- ⚠️ **UX change: bare `we teleop --profile …` now targets the REAL robot** (profile default driver). Pure sim = `--select-profile` + type `local`. CHEATSHEET §2 updated.
+- **Old branch `wip/collection-integration-20260716` preserved** (incl. final snapshot commit `7201ad6`) — full restore point for the pre-merge 60 Hz state.
+- **Upstream-report list grew**: merge-backup test files committed on rewrite-0711; JPEG-quality test stale; (still) head:pico profile test; init gate still not configurable.
+- **NEXT: Orin sync + venv refresh (uv.lock changed!) → robot sanity (reset pose + short teleop feel at 50 Hz — jitter better?) → REAL COLLECTION.** ⚠️ Existing `rubik_test` pose yaml is joint-space, rate-independent — still valid. ⚠️ 07-17 morning validation was at 60 Hz; today's data will be 50 Hz — do NOT mix with any earlier episodes.
 
 **07-17 MIDDAY — EVERYTHING ROBOT-VALIDATED ✓ (reset pose + staged hands + single-side teleop + recording loop). Remaining before real collection: camera serial fix.**
 

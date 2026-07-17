@@ -59,13 +59,13 @@ unset __NV_PRIME_RENDER_OFFLOAD              # EVERY operator shell, INSIDE the 
 export TELEOP_XROBOT_HOST_IP=192.168.31.48   # before pico.sh, else the service grabs the wrong IP
 
 # bimanual (pose capture, normal teleop):
-scripts/runtime/pico.sh pico_world_wuji_hands --driver-address 6.6.7.100
+scripts/runtime/pico.sh pico_world_wuji_hands
 
 # single-side collection (right arm+glove teleoped; left frozen at the task pose):
-scripts/runtime/pico.sh pico_world_wuji_right --driver-address 6.6.7.100
-
-# pure sim (no robot): drop --driver-address
+scripts/runtime/pico.sh pico_world_wuji_right
 ```
+- ⚠️ **Profiles now default `driver_address: 6.6.7.100` (07-17 upstream)** — a bare `we teleop --profile …` targets the REAL robot. **Pure sim needs the selector now**: `we teleop --select-profile`, pick a profile, type `local` in the driver field.
+- Control clock is now **50 Hz** (driver 100 Hz, 1:1 with Gento's internal servo loop — 07-17 upstream anti-jitter change).
 - `pico.sh` sources the XRobot PC service bootstrap itself — no separate step. Connect the PICO app to `192.168.31.48`.
 - Glove preflight: `we hands check --side right` (or `--side both`); network only: `we hands network`.
 - `pico_world_wuji_right` needs only the RIGHT glove adapter + RIGHT PICO controller (left stays racked).
@@ -100,14 +100,14 @@ Hotkeys: `Enter` resume/anchor · `Space` pause · `Tab` reset (ramps to active 
 ## 4. Cube-twist collection — two-session workflow (single-side teleop)
 
 **Session A — capture the task pose (bimanual, once per pose):**
-1. Driver up (§1). Teleop: `scripts/runtime/pico.sh pico_world_wuji_hands --driver-address 6.6.7.100`.
+1. Driver up (§1). Teleop: `scripts/runtime/pico.sh pico_world_wuji_hands`.
 2. `Enter` to anchor + start. Teleop the cube into a solid LEFT-hand grasp; put the right hand at its twist-start position.
 3. While holding the grasp steady: `/` → `setpose rubik_twist` → "task pose saved and active".
 4. Verify the staged reset ONCE: move both arms away → `Tab` → body ramps back first, THEN fingers close (watch for log "reset body converged; commanding captured hand targets", 1 s settle). Re-seat the cube into the closing grasp.
 5. `Esc` to quit teleop. **Leave the driver running** — it PD-holds; the pose file persists on the workstation.
 
 **Session B — single-side collection:**
-1. Teleop: `scripts/runtime/pico.sh pico_world_wuji_right --driver-address 6.6.7.100`. Left glove/controller not needed.
+1. Teleop: `scripts/runtime/pico.sh pico_world_wuji_right`. Left glove/controller not needed.
 2. `/` → `usepose rubik_twist` → "task pose active".
 3. `/` → `rc <dataset>` (e.g. `rc rubik_twist_v0`) — dataset name is independent of the pose name.
 4. `Tab` once → robot ramps to the task pose (arms → fingers). Seat the cube into the left grasp.
