@@ -140,6 +140,14 @@ we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 0
 - **⚠️ MuJoCo window BLACK after pull — fix: `unset __NV_PRIME_RENDER_OFFLOAD` in every operator shell** (verified renders fine). Cause: upstream robo.nix sets `nixgl-nvidia` + PRIME offload for a hybrid laptop; our desktop has RTX 4090 as primary display GPU. Local robo.nix patch pending (needs full shell re-entry); add to upstream-report list (3rd works-on-their-machine bug).
 - ⚠️ Orin: `sync_luna.sh nvidia@6.6.7.100` needed before next driver start (deps unchanged → no venv refresh, but exit/re-enter robo shells: flake.lock changed).
 
+**07-17 MIDDAY — EVERYTHING ROBOT-VALIDATED ✓ (reset pose + staged hands + single-side teleop + recording loop). Remaining before real collection: camera serial fix.**
+
+- On-robot ✓: `setpose rubik_test` → staged reset (body→fingers; fingers now RAMP over 2 s, `a53ee67`, after "too fast" feedback) → `usepose` cross-session → `pico_world_wuji_right` teleop (left welded to pose, left controller asleep = no effect) → full `R`/`S` loop.
+- **Parquet proof** (`rubik_test_v0__20260717T105348`): `action.hand.left` bit-identical non-zero constants on all 701 rows; left-arm action deviation 0.0. IL data path closed.
+- ⚠️ **Camera: driver needs `--camera-serial 419222302053` (our D455)**. Without it the RealSense pipeline grabs the robot's BUILT-IN head cam (that's what today's episodes recorded — throwaway). Canonical driver command now in CHEATSHEET §1. `we camera check` gained `--exposure` (`86780d9`) — re-sync Orin before using it there.
+- **Camera 60 fps UNBLOCKED (07-17 pm)**: D455 was stuck on USB2 (no 60 fps mode) because the hub's A→C converter passes SuperSpeed in ONE orientation only — flipped + marked; hub now USB3.2/5000M, D455 5000M. Topology-check command + full story in week file / CHEATSHEET §1. **Buy a POWERED USB3 hub** (bus-power budget is the 07-15 blackout class risk; shopping checklist in week notes).
+- ⚠️ In every NEW teleop session: `usepose rubik_test` BEFORE the first `Tab` (bare Tab = default init while left hand keeps gripping the cube).
+
 **07-16 EVENING — TASK RESET POSE (plan 1.a) BUILT + SIM-VERIFIED ✓. Tomorrow = cube collection.**
 
 **Branch layout (workstation):**
@@ -153,7 +161,7 @@ we deploy act_pick_toy_0702 --live --driver-address 6.6.7.100:5559 --ckpt-name 0
 
 **TOMORROW (07-17) cube-collection runbook:**
 0. `git fetch` + check teammates' pushes; Orin: `sync_luna.sh nvidia@6.6.7.100` FROM the integration branch + venv refresh if deps complain (SDK pin changed!); exit/re-enter robo shells; `unset __NV_PRIME_RENDER_OFFLOAD` (operator).
-0.5. **BUILD SINGLE-SIDE TELEOP FIRST** (~2 h, spec ready): profile `sides: [right]` — right arm+hand teleoped, left arm PD-held at task pose, left hand keeps the grasp, left glove/controller not needed. Full spec + file list + open questions in [design/single-side-teleop.md](notes/design/single-side-teleop.md). Data format resolved: record the FULL action vector unchanged (left side = constants — good for IL, schema untouched).
+0.5. ~~BUILD SINGLE-SIDE TELEOP~~ — **✅ BUILT 07-17 morning (`ac81a41` on the integration branch), suite green, headless smoke OK.** Profile **`pico_world_wuji_right`** (`sides: [right]`): right arm+glove teleoped, left frozen at task pose, left glove/controller not needed, resets whole-body. ⚠️ Spec correction: idle LEFT hand is actively re-commanded each tick from the task pose's captured grasp (a `None` hand action records ZEROS → deploy would open the hand). Recorded action = applied command = grasp constants; both hand modalities still required. Preflight: `we hands check --side right`. Sim check pending (untracked `keyboard_right_tmp.yaml` in tree — delete after; it fails the profile-list contract test while present). Status header w/ details in [design/single-side-teleop.md](notes/design/single-side-teleop.md).
 1. **CAMERA IS BLOCKING**: robot recording requires image modality (wuji profile). Unresolved from 07-15: Orin driver didn't see synced `cameras.yaml`. Now easier: `we camera check`, then `we driver run --auto-reset-errors --camera-name tianji_head_d455 --camera-exposure 100` (new flag; 100 = 10 ms in D455 units).
 2. Gloves: sanity in sim first (`sim_glove_to_hand.py --side right`), pinch thresholds currently index/middle 1.5/2.0 both hands, tactile gates OFF (phantom pressure likely = SDK 2026.7.2 artifact — RE-TEST gates on 2026.6.18, may re-enable).
 3. **Test staged hand reset with gloves** (sim ok) BEFORE robot.

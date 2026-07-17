@@ -4,6 +4,16 @@
 > collection (est. ~2 h incl. tests). Base: `wip/collection-integration-20260716`
 > (feature work goes on `feat/task-reset-pose` or a new branch off it).
 > ← context: [week-2026-07-13](../weekly-notes/week-2026-07-13.md) · HANDOFF runbook
+>
+> **STATUS 07-17: BUILT (`ac81a41`) + ROBOT-VALIDATED same day** — full test plan incl.
+> recording loop; parquet proof: left-hand action = bit-identical non-zero grasp
+> constants, left-arm action deviation 0.0 (`rubik_test_v0__20260717T105348`). One spec correction: the idle hand must NOT stay `None` — a `None`
+> hand action is *recorded as zeros* (`encode.py:_hand`) and fails the required-
+> modality check; instead the control loop fills the idle side each tick from the
+> active task pose's captured hand targets (recorded action = applied command =
+> grasp constants). Both hand modalities stay required — open question 1 resolved
+> (modality source = driver-applied command + measured sensor), question 2
+> confirmed (IK freezes inactive joints at seed; regression test added).
 
 ## What the user wants (in their words, confirmed)
 
