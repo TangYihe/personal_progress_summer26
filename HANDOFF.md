@@ -3,38 +3,48 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-07-17 (week closed)** — collection pipeline built + robot-validated,
-> then BLOCKED by two root-caused bugs, both reported to labmates with evidence.
+> Last session: **2026-07-20 (cut short, unwell)** — labmates' fixes merged, wuji-sdk +
+> firmware updated, Quest teleop verified working in sim, new PICO tracking-snap issue
+> found + reported. Full detail in [notes/weekly-notes/week-2026-07-20.md](notes/weekly-notes/week-2026-07-20.md).
 
 ---
 
-## PICK UP NEXT (as of 2026-07-17 evening — start here)
+## PICK UP NEXT (as of 2026-07-20 — start here)
 
-1. **HR coordination (OVERDUE — do before anything technical):** message HR colleagues to
-   assign + schedule operator(s) for the **07-25/26 on-site demo sessions** and recurring
-   slots after. People need to block their weekend.
-2. **rtprio experiment on the Orin** (Issue 1 candidate fix, 5 min, no operator needed):
-   `echo 'nvidia - rtprio 20' | sudo tee /etc/security/limits.d/99-we-teleop-rtprio.conf`
-   → log out/in → restart driver → startup line should say `policy=SCHED_FIFO` (not the
-   `SCHED_FIFO unavailable` warning). Then re-test: still episode + moving episode; watch
-   for `interpolation lookahead rejected` / forced pauses. Report outcome to driver owner.
-3. **Check labmates' responses to the two bug reports**
-   ([notes/issues/2026-07-17-shakedown-issues.md](notes/issues/2026-07-17-shakedown-issues.md)):
-   (1) retarget stall on finger movement = COLLECTION BLOCKER, retargeting owner;
-   (2) driver playout faults + unintended movement (⚠️ safety), driver owner. Pull their
-   fixes when pushed (expect rewrite-0711), re-run the finger-movement repro + a 5-episode
-   collection smoke before trusting it.
-4. **Then: real cube-twist collection** (pipeline is otherwise READY): driver w/ camera
-   serial + exposure → `pico_world_wuji_hands` → real grasp → `setpose rubik_twist` →
-   `pico_world_wuji_right` → `usepose` → `rc <dataset>` → `R`/`S` loop (CHEATSHEET §4).
+1. **Confirm HR/operator scheduling for 07-25/26 is actually done** — this was flagged
+   overdue on 07-17; verify before anything else, it has a human-latency clock.
+2. **PICO tracking-snap (⚠️ safety, root-caused 07-20)**: right-controller VIO snap caused
+   two arm lurches; full evidence + suggested fix (task-space step clamp) in
+   [notes/issues/2026-07-20-pico-tracking-snap.md](notes/issues/2026-07-20-pico-tracking-snap.md)
+   — send to teleop owner if not sent yet. Teammates ruled out battery; suggest trying a
+   different PICO angle/placement next session (untested).
+3. **Right-hand Wuji calibration didn't save** — re-run
+   `calibrate_wuji_hand.py --hand right --tactile-check`; also zero/delete the right
+   hand's `thumb_abd_track` (`w: 30`, still the labmates' value) in
+   `config/inputs/retargeting/wuji_finetune.json`. Left hand done + sim-verified.
+4. **Quest teleop verified in sim (zero code changes needed)** — `pico_world` profile
+   tracks correctly via the existing PICO receiver once the headset is on the teleop LAN
+   (192.168.31.x, not office wifi) and the XRobo PC service is running. Mount is
+   3D-printing (blocks robot trial). Once printed: robot-validate Quest teleop; Quest also
+   has controller-visibility limits (design mount placement with camera visibility in
+   mind, not just ergonomics).
+5. **07-27 (Mon) demo shoot needs prep** — multiple shots planned, prep not yet scoped.
+   **First step: ask teammates what props/equipment they already have** before buying
+   anything. Then shot list + task selection + run-through, done early in the week.
+6. **Then: real cube-twist collection** (pipeline READY once #3 is done): driver w/
+   camera serial + exposure → `pico_world_wuji_hands` → real grasp → `setpose rubik_twist`
+   → `pico_world_wuji_right` → `usepose` → `rc <dataset>` → `R`/`S` loop (CHEATSHEET §4).
    Verify first parquet (50 Hz spacing, left-hand grasp constants, D455 frames).
-5. Standing: notes repo committed — **push it yourself** if not yet done; jitter-parquet
-   verdict follow-up; 50 Hz 一卡一卡 feel verdict for the labmate once teleop is usable.
+7. Standing: notes repo committed — **push it yourself**; jitter-parquet verdict
+   follow-up; 50 Hz feel verdict for the labmate.
 
-**Tree state:** workstation + Orin on `wip/collection-integration-20260717` (= origin
-rewrite-0711 `dfddafb` + our 7 commits + backup-file removal), Orin venv refreshed.
-Suite: 466 passed / 4 known fails (2 upstream, 2 init-gate locals). Saved task pose
-`rubik_test` (throwaway); capture a real `rubik_twist` before collecting.
+**Tree state:** workstation on `wip/collection-integration-20260720` (= origin
+rewrite-0711 `09b7273` + our 9 commits + 1 driver-reset restore fix), NOT pushed. Orin
+needs `sync_luna.sh nvidia@6.6.7.100` + venv refresh (uv.lock changed) before next driver
+start. Suite: 536 passed / 8 known fails (6 pre-existing on clean upstream tip, 2
+init-gate locals). wuji-sdk 2026.7.14 + matching glove/hand firmware. Init gate now 2.5°
+(bumped from 2.0° — 3rd bump, trend tracked in week file, Arm_R6 measured 2.01°). Saved
+task pose `rubik_test` (throwaway); capture a real `rubik_twist` before collecting.
 
 ---
 
@@ -69,7 +79,7 @@ Note: local snapshot branches: **`wip/d455-exposure-fix-20260709`** (`96cc236`, 
 
 **Uncommitted working-tree changes (07-09):** `driver.py` (exposure 100), `config/teleop/pico_ee_absolute_wuji_hands.yaml` (torso false), `config/inputs/retargeting/wuji_right.yaml` (middle d2 3.0), + 4 `act_pick_toy*.yaml` staged. All flow to the Orin via `sync_luna.sh` (mirrors working tree).
 
-**Weekly notes:** [notes/weekly-notes/week-2026-07-13.md](notes/weekly-notes/week-2026-07-13.md) (prev: [week-2026-07-06.md](notes/weekly-notes/week-2026-07-06.md))
+**Weekly notes:** [notes/weekly-notes/week-2026-07-20.md](notes/weekly-notes/week-2026-07-20.md) (prev: [week-2026-07-13.md](notes/weekly-notes/week-2026-07-13.md))
 
 ---
 
