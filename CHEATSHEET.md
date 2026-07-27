@@ -94,6 +94,7 @@ Hotkeys: `Enter` resume/anchor · `Space` pause · `Tab` reset (ramps to active 
 - **Pinch snap is TASK-DEPENDENT** (07-16): twist-heavy tasks → right hand `d1=d2=0` (snap off); pinch/grasp tasks → normal (~1.5/2.0).
 - Sim preview (no robot, physical display): `python scripts/inputs/sim_glove_to_hand.py --side right` — loads the same yaml as live teleop; prints `dist_cm`/`pinch_alpha`/`press_gate`.
 - Old `calibrate_wuji_pinch.py` is not in the rewrite tree; calibration/finetune tooling is the labmate's workstream (his branch is merged into our integration branch — SDK pin 2026.6.18).
+- ⚠️ **Glove connect timeout** (`WujiException: Connection timeout`; `ip neigh` shows ARP `FAILED` but the dongle has carrier + steady RX): the glove is alive but unreachable at `.100/.101`. Top cause after cable work = the two glove ethernet cables **cross-wired** (each on the other USB dongle) — workstation config (static `.166/.167` + host routes) is fine and unchanged. Confirm with `sudo tcpdump -i <dongle> -nn -c5`: if the source IP is the *other* glove's, **swap the two cables**. (Carrier up + ARP FAIL + steady RX = alive → wiring/hung, not power; silent RX = power-cycle the glove.) [07-27]
 
 ---
 
@@ -114,6 +115,25 @@ Hotkeys: `Enter` resume/anchor · `Space` pause · `Tab` reset (ramps to active 
 5. Episode loop: `R` (ramps to pose, auto-records at pose) → `Enter` if paused → do the twist with the right hand → `S` (save) → re-seat cube → `R` → …
 6. Left arm stays frozen at the pose all episode; left hand action records the captured grasp constants (NOT zeros) — verify once in the first parquet.
 7. `home` at session end (clears pose, default init). Stop teleop before the driver; **hands open on driver stop — catch the cube.**
+
+---
+
+## 4.1 Replay a recorded episode (hardware sanity check + reset preview)
+Drives the robot from a RECORDED trajectory — great post-hardware-change power/comms check
+(no live teleop; no camera needed). Workstation, physical display.
+- ⚠️ **Dataset must be ALL-CLEAN**: `load_replay` loads every episode and rejects the whole set
+  on the first `faulty` one → use a `_repaired`/`_merged` set, NOT a raw batch.
+- ⚠️ `unset __NV_PRIME_RENDER_OFFLOAD` first (else black MuJoCo window).
+- Profile: **`keyboard_wuji_hands`** drives BOTH robot hands with keyboard arms and **no
+  PICO/XRobot** (simplest for replay); `pico_world_wuji_right` needs `source
+  scripts/setup/bootstrap_xrobot_pc_service.sh`; `keyboard` = arms only (hands held). Any wuji
+  profile spawns both glove readers → **BOTH gloves must be reachable** (.100/.101).
+```bash
+we data replay <all-clean-dataset> --episode N --pose <name> \
+  --profile keyboard_wuji_hands --driver-address 6.6.7.100 --yes
+```
+- Starts PAUSED w/ the pose pre-activated → `Tab` ramps (staged body→hands; place the object) →
+  `Enter` plays the recording → `Esc` quits.
 
 ---
 

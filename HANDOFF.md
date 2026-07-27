@@ -3,25 +3,180 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-07-20 (cut short, unwell)** — labmates' fixes merged, wuji-sdk +
-> firmware updated, Quest teleop verified working in sim, new PICO tracking-snap issue
-> found + reported. Full detail in [notes/weekly-notes/week-2026-07-20.md](notes/weekly-notes/week-2026-07-20.md).
+> Last session: **2026-07-27** — on-site week begins. TIANJI staff redid the robot 走线 (cable
+> routing); verified arms + both hands + power/comms via `we data replay` (all good). Path was
+> bumpy: init-gate trip → 上位机 recovery; raw dataset unreplayable (use `_repaired`/`_merged`);
+> both gloves timed out = cables **cross-wired** by the 走线 (swapped back); black MuJoCo = forgot
+> `unset __NV_PRIME_RENDER_OFFLOAD`. Scoped the on-site demo provisioning (teleop-only offline SSD
+> seed; 千兆网 but NO VPN) → runbook
+> [notes/checklists/2026-07-29-onsite-provisioning-runbook.md](notes/checklists/2026-07-29-onsite-provisioning-runbook.md).
+> Full detail: [notes/weekly-notes/week-2026-07-20.md](notes/weekly-notes/week-2026-07-20.md) (07-27 log).
 
 ---
 
-## PICK UP NEXT (as of 2026-07-20 — start here)
+## WHEN YOU'RE BACK — 2026-07-28 (start here)
 
-1. **Confirm HR/operator scheduling for 07-25/26 is actually done** — this was flagged
-   overdue on 07-17; verify before anything else, it has a human-latency clock.
+**Demo shoot 07-30 (setup 07-29). 07-28 = heavy prep day. Pipeline is validated (16/16); focus is
+now on-site readiness.** `git pull we-teleop` first (frozen-tree demo prep — sanity-check before
+pulling anything disruptive). Batched by operator-need:
+
+1. 🔴 **Nix→SSD migration rehearsal (HIGHEST RISK)** — build the offline SSD + provision the spare
+   workstation with the network UNPLUGGED, per
+   [notes/checklists/2026-07-29-onsite-provisioning-runbook.md](notes/checklists/2026-07-29-onsite-provisioning-runbook.md).
+   Teleop-only (operator venv only, ~13 GB). Give it a real block; resolve the 3 ⚠️ unknowns there.
+2. **Operator session (batch):** (a) **torso teleop** — our own `torso: hold` edit turned it off;
+   re-enable a tracking mode in a test profile, sim first then robot (chassis stays off — fails
+   closed, needs a separate controller). (b) **hand teleop A/B** — prep TWO stable hand yamls
+   (pinch-enhanced vs plain); no switch mechanism, so swap = `cp <preset> wuji_right.yaml` + restart
+   teleop.
+3. **Hardware transport inventory** — packing list; adapter/hub count gated on TIANJI's port answer
+   (pack generous: 2× USB-ethernet, USB hub, spare cables; + the provisioned SSD, gloves + both
+   dongles, Quest + mounts, pre-configured router, e-stop).
+4. **Chase replies:** TIANJI workstation specs (esp. **NVIDIA?** — gates the MuJoCo viewer) +
+   wifi/firewall + Wed access; labmate on torso/head teleop enable.
+
+⚠️ Glove gotcha logged this session: connect-timeout with carrier-up = check for **cross-wired
+glove cables** (tcpdump the dongle, swap if the source IP is the other glove's). CHEATSHEET §3.
+
+---
+
+## WHEN YOU'RE BACK — 2026-07-24 (archived — pipeline validated ✓)
+
+**State:** Full pipeline works (train → deploy). v0 policies go OOD on the precision twist
+(actions fine — open-loop MSE ~5e-5, gt-obs ~75%; killers = live-obs gap + thin data). Pivoted to
+more+cleaner data (v1 merged, 195 clean eps). **07-23: the v1 policies were NOT trained** — both
+horizontal runs had crashed overnight (DataLoader worker segfault; `num_workers:32` too high for a
+video policy — see [[train-dataloader-segfault]]). Root-caused + fixed; retraining relaunched fresh.
+Replay validated on hardware ✓.
+
+**🌙 TRAINING RUNNING OVERNIGHT (started 07-23 18:43, tmux `train`):**
+- Fresh runs, `num_workers:4`, **50k steps** each, BOTH sequential (chunk-100 `&&` chunk-200).
+  Configs `config/policy/act_rubik_twist_horizontal.yaml` + `_chunk200.yaml` (edited: num_workers
+  32→4, steps 100k→50k — UNCOMMITTED). Crashed 32-worker dirs parked at `*_crashed20k`/`*_crashed10k`.
+- **FIRST THING: check they finished** → `we_policy.json` present at
+  `artifacts/checkpoints/act_rubik_twist_horizontal/` (+ `_chunk200`). Missing / only partial
+  checkpoints = crashed again → `tmux attach -t train`, read the error. **The tell the fix held is
+  clearing ~20k steps** (both prior runs died at 13k/20k).
+- Relaunch a run (fresh, NOT `--resume` — resume restores the old 32-worker config):
+  `robo run -p training -- we train act_rubik_twist_horizontal`. Loss plateaus ~0.05 early.
+
+**🎯 PLAN 07-24 (busy: hardware onsite; operator here):**
+1. **EVAL the v1 policies** (once trained). Commands CORRECTED for this tree:
+   - **gt-obs** (policy actions from recorded obs, open-loop on robot) — from a training superset
+     shell (deploy recipe [[deploy-venv-gap]]) with xrobot paths exported, run **`we deploy` DIRECTLY
+     — NOT via pico.sh (pico.sh re-runs the cmake build → GLIBC crash):**
+     ```
+     we deploy act_rubik_twist_horizontal \
+       --gt-obs artifacts/data/robot/2026-07-22__rubik_twist_horizontal_merged \
+       --episode N --pose rubik_twist_horizontal_v1 \
+       --profile pico_world_wuji_right --driver-address 6.6.7.100 --checkpoint-name last
+     ```
+   - **live** closed-loop: same but DROP `--gt-obs …`, ADD `--temporal-aggregation` (uses live camera).
+   - ⚠️ `--live`/`--ckpt-name` are GONE on this tree; live = default when `--driver-address` set and
+     no `--gt-obs`; checkpoint = `--checkpoint-name last`/`--checkpoint-step`.
+   - ⚠️ Profile **`pico_world_wuji_right`** (single-side — dataset meta confirms `sides:[right]`).
+     A wuji profile REQUIRES the gloves connected (IPs 192.168.1.100/.101) or replay AND deploy fail.
+     In-session hand-open (`home`) needs a wuji profile; under `keyboard` the hand stays gripped
+     (bounce the driver to open — hands open on driver shutdown).
+2. **Teleop-pipeline checks w/ operator** — full checklist:
+   [notes/checklists/2026-07-24-pre-demo-hardware-check.md](notes/checklists/2026-07-24-pre-demo-hardware-check.md).
+   Covers: 2 hand-retarget presets (enhanced-pinch vs pinch-off — swap mechanism NOT built yet),
+   thumb naturalness (coord w/ retargeting owner), body/torso lower pose (torso is all-or-nothing
+   `hold`/`ik`; static captured pose = safe fallback), smoothing (hand smoothing IS merged; values
+   are hardcoded Python not yaml), ⚠️ **CHASSIS not in pipeline** (fails-closed per CLAUDE.md — film
+   plan needs base+upper-body together → raise w/ owner+advisor), D455 USB3, Quest tracking, e-stop.
+3. **THEN soften the reset grip** — only after eval baselines as-trained behavior (transmission-slip
+   mitigation); keep the pose name so deploy-reset matches the data.
+4. **Advisor reply** — scope / on-site decision-maker / hard deadline (asked 07-23). 🛒 asset buy-list
+   STILL open. Big upstream merge = DEFERRED post-demo (plan:
+   [notes/implementation/upstream-merge-plan-20260723.md](notes/implementation/upstream-merge-plan-20260723.md)).
+5. **Stable branch (07-23 item #3, NOT done)** — cut a self-maintained demo branch off the validated
+   07-20 tree + today's edits; isolate from labmate churn. Uncommitted edits to fold in: num_workers/
+   steps (2 configs), `pico_world.yaml` head/torso hold, `wuji_finetune.json` recal,
+   `repair_missing_images.py`. Also fix the stale CHEATSHEET deploy commands. Claude to draft.
+
+⚠️ camera frame-drops still unfixed (batch1 ~8% / batch2 ~11% faulty) — fix at source (USB3 5000M /
+`config/cameras.yaml` d455 60→30 fps / powered hub) when there's a window.
+
+**Two new features committed (local, NOT pushed — Yihe pushes):** `cbd02af` `we data replay --pose`;
+`4c851b5` gt-obs HARDWARE deploy (`we deploy --gt-obs <ds> --driver-address <host>` runs the policy
+on RECORDED obs while publishing its actions to the robot). ⚠️ both touch `control_process.py` →
+re-port after the big merge; CLAUDE.md owning-doc update owed. Deploy env recipe (non-durable) + the
+`we_policy.json`/vision-policy gotcha are in the 07-22 week log.
+
+**🔴 Camera frame-drops STILL UNFIXED** — at 200 eps this faulty-outs a fraction / leans on the
+forward-fill repair (bad for a vision policy). Fix at source when there's a window: confirm D455 on
+**USB3 5000M** (CHEATSHEET §1 sysfs check), or drop `config/cameras.yaml` d455 `fps: 60`→`30`, +
+powered USB3 hub (still unbought).
+
+**Then:**
+1. **Thumb:** run `calibrate_thumb_spread.py` on the RIGHT glove — A/B proved `thumb_abd_track`
+   is the right lever for thumb flexibility; fit it to OUR glove (don't reuse labmates' `w:30`).
+2. **Watch right pinch `d2`** (large: index 5.56 / middle 6.51) — lower if fingers over-stick.
+3. **Train a first ACT — READY, dry-run verified.** `config/policy/act_rubik_twist.yaml` points
+   at the repaired 50-ep dataset (`include_hands: true`). Just run:
+   `robo run -p training -- we train act_rubik_twist` (dry-run resolved clean: ACT/cuda/50k/batch32).
+   ⚠️ Training venv had a stale launcher (`typer_main`→`main`) — already fixed via
+   `robo run -p training -- uv pip install -e . --no-deps`; if it recurs, same fix.
+4. 🛒 **Asset purchase** (Yihe) — buy-list + arrival date; awaiting TIANJI reply on setup/wifi.
+5. Upstream-report: camera frame-drop; curate can't repair `missing_required_image`;
+   `--driver-address local` flag not normalized to sim.
+
+**🚩 #1 BIG UPSTREAM MERGE = TOMORROW's milestone (07-22).** User wants it done (fast-iterating
+project). Treat as a milestone: Claude examines the 239-file rewrite-0711 refactor and brings a
+STAGED plan to review BEFORE executing. Conflict scope mapped (07-21 log): ~14 files incl.
+`control_process.py` (rewritten → re-implement our task-pose logic), `src/we/cli.py` (split →
+re-port), `driver.py` (collides w/ their reset-unification). ⚠️ Claude can't fetch/push (HTTPS
+creds) → Yihe runs those; ⚠️ upstream built PARALLEL reset/single-hand → coordinate w/ owner on
+whose version wins before pushing our feature to the shared branch.
+
+**#2 DONE (07-21):** `feat/repair-missing-frames` — `scripts/data/repair_missing_images.py`
+forward-fills dropped frames; verified 50/50 clean. Still fix the camera drop at the source
+(top priority above) so future collection doesn't lean on the repair.
+
+**07-22 MORNING — first steps (planned 07-21 eve):**
+0. Check overnight training: checkpoints in `artifacts/checkpoints/act_rubik_twist` (10k/20k/…),
+   loss curve sane (wandb). Driver up (hands + camera); Orin sync if the tree changed.
+1. **Replay validation — feature BUILT 07-21 eve** on `feat/replay-initial-pose` (sim-verified,
+   HARDWARE-UNTESTED). `we data replay <ds> --episode N --pose rubik_twist_test --profile
+   <hands> --driver-address 6.6.7.100 --yes` now starts PAUSED with the pose pre-activated →
+   **`Tab`** ramps to the pose (staged: body then hand closes — place the cube in the window) →
+   **`Enter`** plays the recording (RESUME already triggers replay `begin_approach`+`play`).
+   ⚠️ First hardware run: workspace clear, hands out, ready on `Space`/`Esc`. ⚠️ Also fixed a
+   PRE-EXISTING replay crash (`replay.task`→`replay.dataset_label`; replay didn't run at all
+   before). ⚠️ OPEN Q: which profile for hands replay WITHOUT live gloves (a `wuji` profile may
+   demand glove processes) — sort at first run. ⚠️ Edits `control_process.py` → re-port after
+   the big merge. Files: `control_process.py`, `supervisor.py`, `runtime/cli/data.py`.
+2. **Inference w/ custom init = READY, no new code.** `we deploy act_rubik_twist --profile
+   pico_world_wuji_right --driver-address 6.6.7.100` starts PAUSED (shares run_operator) →
+   `:usepose rubik_twist_test` → `Tab` (staged reset, place cube in the window) → `Enter`
+   (policy drives from the grasp pose). Needs a checkpoint from #0. Deploy default is gt_obs →
+   pass `--live`? (verify: rewrite deploy route; `--driver-address` = live hardware.)
+   ⚠️ Deploy chunk knobs: n_action_steps 100 (executes full 2 s chunk) — sweep smaller for
+   tighter closed-loop if the twist drifts.
+
+(Big upstream merge = the other 07-22 milestone; separate from this morning block.)
+
+**Local working-tree changes this session (uncommitted, on `wip/collection-integration-20260720`):**
+- `config/teleop/pico_world.yaml`: head/torso → `hold`.
+- `config/inputs/retargeting/wuji_finetune.json`: left + right fresh recal; `thumb_abd_track`
+  removed from both (both thumbs `w=0`).
+- NEW `scripts/data/repair_missing_images.py` (on `feat/repair-missing-frames`).
+
+---
+
+## PICK UP NEXT (as of 2026-07-20)
+
+1. ~~**Confirm HR/operator scheduling**~~ ✅ **DONE 07-21** — operators locked, on-site starts
+   Mon 07-27.
 2. **PICO tracking-snap (⚠️ safety, root-caused 07-20)**: right-controller VIO snap caused
    two arm lurches; full evidence + suggested fix (task-space step clamp) in
    [notes/issues/2026-07-20-pico-tracking-snap.md](notes/issues/2026-07-20-pico-tracking-snap.md)
    — send to teleop owner if not sent yet. Teammates ruled out battery; suggest trying a
    different PICO angle/placement next session (untested).
-3. **Right-hand Wuji calibration didn't save** — re-run
-   `calibrate_wuji_hand.py --hand right --tactile-check`; also zero/delete the right
-   hand's `thumb_abd_track` (`w: 30`, still the labmates' value) in
-   `config/inputs/retargeting/wuji_finetune.json`. Left hand done + sim-verified.
+3. ~~**Right-hand Wuji calibration didn't save**~~ ✅ **DONE 07-21** — recal saved; both hands
+   at parity; labmates' `thumb_abd_track w:30` removed (both thumbs default). Proper thumb-spread
+   calib on our glove (`calibrate_thumb_spread.py`) still TODO for more thumb flexibility.
 4. **Quest teleop verified in sim (zero code changes needed)** — `pico_world` profile
    tracks correctly via the existing PICO receiver once the headset is on the teleop LAN
    (192.168.31.x, not office wifi) and the XRobo PC service is running. Mount is
