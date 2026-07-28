@@ -4,6 +4,29 @@
 > tonight; **execute tomorrow as a dedicated block, not before the eval work.**
 > Claude cannot fetch/push — Yihe runs all `git fetch`/`push`.
 
+---
+
+## ✅ OUTCOME — executed 2026-07-28 against `refactor-0722` (deferred from 07-23)
+
+The merge was deferred through the demo crunch and done 07-28 once the shoot moved to 08/11–08/13.
+**Target changed to `origin/refactor-0722`** (newer than the master/rewrite-0711 line this plan assumed;
+`refactor-0722` ⊇ `rewrite-0711`, +133 commits / 342 files / +49.7k). Approach was **fresh branch off
+`origin/refactor-0722` + re-implement**, NOT rebase — the core (control_process, CLI, IK-as-a-process,
+schema v11, `embodiments.yaml`) was rewritten, so cherry-pick was infeasible.
+
+- **Branches:** integration = `wip/collection-integration-20260728`; rollback = `wip/pre-refactor-0722-merge-20260728` (`d5f7e6a`).
+- **Landed (3 commits):** `9c83c95` retargeting tuning (SHAREABLE) · `06757f6` LOCAL machine config ·
+  `1c7a1c3` LOCAL init-gate loosen. Suite 997 pass / 4 known fails (2 env + 2 our gate-pinning), ruff clean.
+- **Big simplifier:** most of our features were already upstream (init_pose = our task-reset-pose;
+  camera `--camera-exposure`; thumb `w=30`; side-aware hand receivers; global reset pose). So B = adopt
+  theirs (no code); C–G deferred; G writes a fresh v3 config from `act_turn_cube.yaml` when new data lands.
+- **Carry-forward to report:** `act_turn_cube.yaml` ships `num_workers: 32` = our segfault; report to william.
+- **Not done (07-29):** Yihe re-verifies + pushes (LOCAL commits excluded); Orin sync before robot.
+
+Full per-feature detail: [../weekly-notes/week-2026-07-27.md](../weekly-notes/week-2026-07-27.md) (07-28 log).
+
+---
+
 ## Scope (measured 2026-07-22 18:45 after fetch)
 
 - **Target is now `origin/master`**, not `rewrite-0711`. They merged

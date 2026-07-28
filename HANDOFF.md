@@ -3,40 +3,53 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-07-27** — on-site week begins. TIANJI staff redid the robot 走线 (cable
-> routing); verified arms + both hands + power/comms via `we data replay` (all good). Path was
-> bumpy: init-gate trip → 上位机 recovery; raw dataset unreplayable (use `_repaired`/`_merged`);
-> both gloves timed out = cables **cross-wired** by the 走线 (swapped back); black MuJoCo = forgot
-> `unset __NV_PRIME_RENDER_OFFLOAD`. Scoped the on-site demo provisioning (teleop-only offline SSD
-> seed; 千兆网 but NO VPN) → runbook
-> [notes/checklists/2026-07-29-onsite-provisioning-runbook.md](notes/checklists/2026-07-29-onsite-provisioning-runbook.md).
-> Full detail: [notes/weekly-notes/week-2026-07-20.md](notes/weekly-notes/week-2026-07-20.md) (07-27 log).
+> Last session: **2026-07-28** — demo shoot **POSTPONED to 08/11–08/13** (partner delay) → refocused
+> on the project (long-horizon **bimanual** data + train) and did the **big upstream merge to
+> `refactor-0722`**. New integration branch **`wip/collection-integration-20260728`** (off
+> `origin/refactor-0722`); rollback = **`wip/pre-refactor-0722-merge-20260728`** (`d5f7e6a`). Carried
+> only our real deltas — 3 commits: 1 SHAREABLE retargeting + 2 **LOCAL** (machine config, init-gate).
+> Adopted upstream `init_pose` (= our task-reset-pose); deferred single-side/gt-obs/replay-pose/data
+> scripts; fresh policy config when new data lands. Suite **997 pass / 4 known fails** (2 env + 2
+> our-gate-pinning). **NOT verified-by-Yihe, NOT pushed, NOT Orin-synced.**
+> Full detail: [notes/weekly-notes/week-2026-07-27.md](notes/weekly-notes/week-2026-07-27.md) (07-28 log).
 
 ---
 
-## WHEN YOU'RE BACK — 2026-07-28 (start here)
+## WHEN YOU'RE BACK — 2026-07-29 (start here)
 
-**Demo shoot 07-30 (setup 07-29). 07-28 = heavy prep day. Pipeline is validated (16/16); focus is
-now on-site readiness.** `git pull we-teleop` first (frozen-tree demo prep — sanity-check before
-pulling anything disruptive). Batched by operator-need:
+**The upstream merge is CODE-COMPLETE on `wip/collection-integration-20260728` (off
+`origin/refactor-0722`) but not yet verified-by-you or pushed. Do these in order:**
 
-1. 🔴 **Nix→SSD migration rehearsal (HIGHEST RISK)** — build the offline SSD + provision the spare
-   workstation with the network UNPLUGGED, per
-   [notes/checklists/2026-07-29-onsite-provisioning-runbook.md](notes/checklists/2026-07-29-onsite-provisioning-runbook.md).
-   Teleop-only (operator venv only, ~13 GB). Give it a real block; resolve the 3 ⚠️ unknowns there.
-2. **Operator session (batch):** (a) **torso teleop** — our own `torso: hold` edit turned it off;
-   re-enable a tracking mode in a test profile, sim first then robot (chassis stays off — fails
-   closed, needs a separate controller). (b) **hand teleop A/B** — prep TWO stable hand yamls
-   (pinch-enhanced vs plain); no switch mechanism, so swap = `cp <preset> wuji_right.yaml` + restart
-   teleop.
-3. **Hardware transport inventory** — packing list; adapter/hub count gated on TIANJI's port answer
-   (pack generous: 2× USB-ethernet, USB hub, spare cables; + the provisioned SSD, gloves + both
-   dongles, Quest + mounts, pre-configured router, e-stop).
-4. **Chase replies:** TIANJI workstation specs (esp. **NVIDIA?** — gates the MuJoCo viewer) +
-   wifi/firewall + Wed access; labmate on torso/head teleop enable.
+1. **Re-verify the suite** (left green at 997 pass / 4 known fails):
+   `robo run -p ci -- uv sync --locked --extra operator --extra render --group dev` →
+   `robo run -p ci -- uv run pytest -q tests/acceptance tests/regression`.
+   ⚠️ The 4 fails are EXPECTED: 2 env-only (git-tag identity in sandbox; `view_wuji_deep_capture`
+   needs the `data-rerun` extra) + 2 from our local init-gate loosen (`test_driver_startup`,
+   `test_reset_lifecycle` pin the strict 0.5°/1.0° gate).
+2. **Push (you own pushes).** 3 commits on top of `origin/refactor-0722` (`49199da`):
+   - `9c83c95` retargeting tuning — **SHAREABLE** (push boundary)
+   - `06757f6` + `1c7a1c3` — **LOCAL, DO NOT PUSH** (serials/D455/holds/finetune; init-gate loosen —
+     would break labmates' unloaded setup). Coordinate with the owner before pushing the shareable
+     commit to a shared branch.
+3. **🔴 Orin sync BEFORE any robot session** (Orin still on the OLD tree; deps/flake changed a lot):
+   `scripts/setup/sync_luna.sh nvidia@6.6.7.100` →
+   `robo run -p tianji-driver -- uv sync --locked --extra camera --extra wuji-hand` →
+   EXIT + re-enter every robo shell on both machines (flake.lock changed).
+4. **Report to william:** `config/policy/act_turn_cube.yaml` ships `num_workers: 32` → the
+   video-DataLoader **segfault** we root-caused ([[train-dataloader-segfault]]); we run 4. (Leave his
+   `Call me Daddy` line in `CLAUDE.md` alone — intentional per Yihe.)
+5. **Then real work:** collect the new long-horizon **bimanual** task; write a fresh v3 policy config
+   (copy `config/policy/act_turn_cube.yaml` → set `dataset`/`output_dir`, `num_workers: 4`,
+   `include_hands`). init_pose capture now uses upstream `init_pose capture <name>` (was our `setpose`).
 
-⚠️ Glove gotcha logged this session: connect-timeout with carrier-up = check for **cross-wired
-glove cables** (tcpdump the dongle, swap if the source IP is the other glove's). CHEATSHEET §3.
+**Housekeeping (optional):** `third_party/GMR` (1.2 GB) + `third_party/policy` are untracked leftovers
+NOT referenced by refactor-0722 — removable. Submodules `Isaac-GR00T`/`Psi0`/`Unity-Client` are
+uninitialized — `git submodule update --init --recursive` only if those workflows are needed.
+
+**Rollback anytime:** `git switch wip/pre-refactor-0722-merge-20260728` (`d5f7e6a`).
+
+⚠️ Glove gotcha (standing): connect-timeout with carrier-up = check for **cross-wired glove cables**
+(tcpdump the dongle, swap if the source IP is the other glove's). CHEATSHEET §3.
 
 ---
 
