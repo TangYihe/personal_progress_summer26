@@ -3,44 +3,63 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-07-28** — demo shoot **POSTPONED to 08/11–08/13** (partner delay) → refocused
-> on the project (long-horizon **bimanual** data + train) and did the **big upstream merge to
-> `refactor-0722`**. New integration branch **`wip/collection-integration-20260728`** (off
-> `origin/refactor-0722`); rollback = **`wip/pre-refactor-0722-merge-20260728`** (`d5f7e6a`). Carried
-> only our real deltas — 3 commits: 1 SHAREABLE retargeting + 2 **LOCAL** (machine config, init-gate).
-> Adopted upstream `init_pose` (= our task-reset-pose); deferred single-side/gt-obs/replay-pose/data
-> scripts; fresh policy config when new data lands. Suite **997 pass / 4 known fails** (2 env + 2
-> our-gate-pinning). **NOT verified-by-Yihe, NOT pushed, NOT Orin-synced.**
-> Full detail: [notes/weekly-notes/week-2026-07-27.md](notes/weekly-notes/week-2026-07-27.md) (07-28 log).
+> Last session: **2026-07-29** — verified the merge and **PUSHED the first shareable commit** to
+> `origin/refactor-0722`: a re-implemented **`scripts/inputs/sim_glove_to_hand.py`** (live glove→Wuji-hand
+> MuJoCo diagnostic, now with `--record` mp4; ported to refactor-0722 APIs, docs + catalog test). **Orin
+> synced + driver sanity-checked** (bimanual up; hit an Orin offline-DNS hiccup — the flake bump needs
+> internet to fetch robo-nix, restore DNS). Ran **bimanual teleop w/ Quest** and a **hand-retargeting
+> tuning session** (all LOCAL `wuji_finetune.json`). Found + fixed a regression: **hands no longer opened
+> on driver shutdown** (refactor coupled the shutdown pose to `wuji_reset_pose.yaml`) → LOCAL
+> `driver_supervisor.py` fix. **Thumb IP-vs-MCP bending still unresolved** — `segment_scaling.thumb` reset
+> to base didn't help → coordinate with the retargeting owner for other fixes.
+> Full detail: [notes/weekly-notes/week-2026-07-27.md](notes/weekly-notes/week-2026-07-27.md) (07-29 log).
 
 ---
 
-## WHEN YOU'RE BACK — 2026-07-29 (start here)
+## WHEN YOU'RE BACK — 2026-07-30 (start here)
 
-**The upstream merge is CODE-COMPLETE on `wip/collection-integration-20260728` (off
-`origin/refactor-0722`) but not yet verified-by-you or pushed. Do these in order:**
+**Session start:** `git pull` in `we-teleop` (check labmate pushes — the shared branch is
+`origin/refactor-0722`, which now includes our `sim_glove_to_hand` commit `69a309c`). Pull the notes repo.
 
-1. **Re-verify the suite** (left green at 997 pass / 4 known fails):
-   `robo run -p ci -- uv sync --locked --extra operator --extra render --group dev` →
-   `robo run -p ci -- uv run pytest -q tests/acceptance tests/regression`.
-   ⚠️ The 4 fails are EXPECTED: 2 env-only (git-tag identity in sandbox; `view_wuji_deep_capture`
-   needs the `data-rerun` extra) + 2 from our local init-gate loosen (`test_driver_startup`,
-   `test_reset_lifecycle` pin the strict 0.5°/1.0° gate).
-2. **Push (you own pushes).** 3 commits on top of `origin/refactor-0722` (`49199da`):
-   - `9c83c95` retargeting tuning — **SHAREABLE** (push boundary)
-   - `06757f6` + `1c7a1c3` — **LOCAL, DO NOT PUSH** (serials/D455/holds/finetune; init-gate loosen —
-     would break labmates' unloaded setup). Coordinate with the owner before pushing the shareable
-     commit to a shared branch.
-3. **🔴 Orin sync BEFORE any robot session** (Orin still on the OLD tree; deps/flake changed a lot):
-   `scripts/setup/sync_luna.sh nvidia@6.6.7.100` →
-   `robo run -p tianji-driver -- uv sync --locked --extra camera --extra wuji-hand` →
-   EXIT + re-enter every robo shell on both machines (flake.lock changed).
-4. **Report to william:** `config/policy/act_turn_cube.yaml` ships `num_workers: 32` → the
-   video-DataLoader **segfault** we root-caused ([[train-dataloader-segfault]]); we run 4. (Leave his
-   `Call me Daddy` line in `CLAUDE.md` alone — intentional per Yihe.)
-5. **Then real work:** collect the new long-horizon **bimanual** task; write a fresh v3 policy config
-   (copy `config/policy/act_turn_cube.yaml` → set `dataset`/`output_dir`, `num_workers: 4`,
-   `include_hands`). init_pose capture now uses upstream `init_pose capture <name>` (was our `setpose`).
+**🔀 TODAY'S TRACK IS A FORK — pending an external reply Yihe is waiting on:**
+- **(A) Collect data** for the multi-step **rubik-cube twisting** task (long-horizon, bimanual), OR
+- **(B) Side-by-side compare** our teleop system against another one.
+Decide once the reply lands; both use the same teleop bring-up below.
+
+**Teleop bring-up (either track):**
+1. **Orin (driver):** `robo shell -p tianji-driver` →
+   `we driver --auto-reset-errors --camera-serial 419222302053 --camera-exposure 100`
+   (defaults: robot `6.6.7.190`, `pd`, `--move-to-init`, bimanual hands + camera). ⚠️ init-gate may trip
+   on startup → recover via 上位机. ⚠️ Watch the Wuji **`Bus undervoltage` F4J3/F4J4** (07-28) — stop +
+   check the hand power rail if it recurs.
+2. **Workstation (operator):** fresh `robo shell -p operator` → `unset __NV_PRIME_RENDER_OFFLOAD` →
+   `scripts/runtime/pico.sh pico_world_wuji_hands` (Quest tracks via the XRobot service, headset-agnostic;
+   head/torso are held LOCAL; both arms + hands live). `Enter` to anchor.
+3. **If track (A):** write a fresh v3 policy config (copy `config/policy/act_turn_cube.yaml` → set
+   `dataset`/`output_dir`, `num_workers: 4`, `include_hands`) once data lands. Capture the grasp start with
+   upstream `init_pose capture <name>` (was our `setpose`).
+
+**Open threads to carry:**
+- **🔴 Thumb IP-vs-MCP bending** — unresolved; `segment_scaling.thumb` reset to base default (both hands)
+  didn't move it. `thumb_skip_pip: true` (SDK reconstructs thumb MCP inaccurately) limits it upstream of
+  scaling. **Coordinate with the retargeting owner** for other levers.
+- **Still-unpushed SHAREABLE:** `9c83c95` (retargeting pinch 1.5/2.0 + tactile gates off) — held pending
+  owner sign-off, because "gates off" bakes in our phantom-pressure + faulty-left-sensor assumption.
+- **Report to william (still owed):** `config/policy/act_turn_cube.yaml` ships `num_workers: 32` → the
+  video-DataLoader **segfault** ([[train-dataloader-segfault]]); we run 4. (Leave his `Call me Daddy` line
+  in `CLAUDE.md` alone — intentional per Yihe.)
+- **Open-shutdown fix is LOCAL + uncommitted** in `driver_supervisor.py` and NOT on the Orin (post-dates the
+  last sync). To get hands-open-on-shutdown on the robot: `scripts/setup/sync_luna.sh nvidia@6.6.7.100`
+  (rsync only this time — no deps/flake change → no venv refresh, just restart the driver).
+
+**Branch / local state (`wip/collection-integration-20260728`):**
+- `origin/refactor-0722` tip = **`69a309c`** (our `sim_glove_to_hand`, pushed 07-29) on `49199da`.
+- Above the OLD base on wip: `77d169b` (dup of the pushed commit — drops on the next rebase onto
+  `origin/refactor-0722`), `1c7a1c3` + `06757f6` (**LOCAL, do-not-push**), `9c83c95` (SHAREABLE, unpushed).
+- **Uncommitted LOCAL** (do-not-push): `wuji_finetune.json` (thumb `w=30`; **index+middle pinch snap OFF
+  `0/0` both hands**; thumb `segment_scaling` = base default), `pico_world_wuji_hands.yaml` (head/torso
+  `hold`), `driver_supervisor.py` (open-on-shutdown). ⚠️ index/middle pinch is fully off — if a task needs a
+  real index/middle grasp, raise `d2` (~3.0) + restart teleop.
 
 **Housekeeping (optional):** `third_party/GMR` (1.2 GB) + `third_party/policy` are untracked leftovers
 NOT referenced by refactor-0722 — removable. Submodules `Isaac-GR00T`/`Psi0`/`Unity-Client` are
