@@ -3,28 +3,55 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-07-29** — verified the merge and **PUSHED the first shareable commit** to
-> `origin/refactor-0722`: a re-implemented **`scripts/inputs/sim_glove_to_hand.py`** (live glove→Wuji-hand
-> MuJoCo diagnostic, now with `--record` mp4; ported to refactor-0722 APIs, docs + catalog test). **Orin
-> synced + driver sanity-checked** (bimanual up; hit an Orin offline-DNS hiccup — the flake bump needs
-> internet to fetch robo-nix, restore DNS). Ran **bimanual teleop w/ Quest** and a **hand-retargeting
-> tuning session** (all LOCAL `wuji_finetune.json`). Found + fixed a regression: **hands no longer opened
-> on driver shutdown** (refactor coupled the shutdown pose to `wuji_reset_pose.yaml`) → LOCAL
-> `driver_supervisor.py` fix. **Thumb IP-vs-MCP bending still unresolved** — `segment_scaling.thumb` reset
-> to base didn't help → coordinate with the retargeting owner for other fixes.
-> Full detail: [notes/weekly-notes/week-2026-07-27.md](notes/weekly-notes/week-2026-07-27.md) (07-29 log).
+> Last session: **2026-07-31** — **offline-provisioning Part A DONE.** Built + verified the
+> **teleop-only offline seed** (`/home/yihetang/project26/onsite-seed`, **5.8 GB**, also on the USB stick,
+> integrity-checked). Rewrote the runbook against the *post-merge* tree and caught a bug that would have
+> stranded us onsite: **the nix tarball was never captured** (`nix-installer` downloads a nix package →
+> offline install fails at step one; fixed with a shipped, version-matched nix 2.34.7 +
+> `--nix-package-url file://`). Also established that **`~/.cache/nix` is load-bearing**, not optional —
+> refactor-0722 bumped the robo-nix pin so **two revs** must resolve offline (`3c55fa1` for the robo CLI,
+> `fb50985` for the repo lock), which is exactly what broke the Orin on 07-29. **The rehearsal (Part C) is
+> NOT done — deliberately deferred.** No robot/teleop work this session.
+> Full detail: [notes/weekly-notes/week-2026-07-27.md](notes/weekly-notes/week-2026-07-27.md) (07-31 log).
+> ⚠️ **07-30 was never logged** (only artifact: `notes/checklists/leave-office-sop.md`) — which fork was
+> taken that day is unrecorded.
 
 ---
 
-## WHEN YOU'RE BACK — 2026-07-30 (start here)
+## WHEN YOU'RE BACK — next session (start here)
 
 **Session start:** `git pull` in `we-teleop` (check labmate pushes — the shared branch is
-`origin/refactor-0722`, which now includes our `sim_glove_to_hand` commit `69a309c`). Pull the notes repo.
+`origin/refactor-0722`, which includes our `sim_glove_to_hand` commit `69a309c`). Pull the notes repo.
 
-**🔀 TODAY'S TRACK IS A FORK — pending an external reply Yihe is waiting on:**
-- **(A) Collect data** for the multi-step **rubik-cube twisting** task (long-horizon, bimanual), OR
-- **(B) Side-by-side compare** our teleop system against another one.
-Decide once the reply lands; both use the same teleop bring-up below.
+**🔀 Pick ONE. The provisioning rehearsal is short and self-contained; the data/compare fork is the
+bigger thread.**
+
+**(0) 🔴 PROVISIONING REHEARSAL — ~20–30 min, no robot needed, everything is already prepared.**
+The seed is built and on the stick. On the **spare workstation, network cable UNPLUGGED**:
+```bash
+sudo -v
+/mnt/seed/provision.sh        # or wherever the stick auto-mounts there
+```
+It self-checks and **fails the run if `cache.nixos.org`/`github.com` answer**, so the spare's own
+internet can't fake a pass. Then the one manual step (needs a display):
+```bash
+cd /home/yihetang/project26/we-teleop
+robo shell -p operator
+unset __NV_PRIME_RENDER_OFFLOAD          # shellHook re-exports it on EVERY entry
+we teleop --profile keyboard --driver-address local
+# a MuJoCo window must actually RENDER, not be black
+```
+Bring the drive back → `provision-<host>-<date>.log` is on it. ⚠️ Two things change how to read the
+result: **does the spare already have nix?** (then the offline-install unknown stays untested) and
+**is it NVIDIA?** (if not, a viewer failure is a REAL preview of the TIANJI risk —
+`robo.nix` hardcodes `hostGraphics = "nixgl-nvidia"` for `operator`). Then decide the **uv-cache
+question** (13 GB not shipped → no `uv sync --offline` fallback; there's room on the drive).
+Seed is also at `/home/yihetang/project26/onsite-seed` on the workstation, and reproducible from the
+runbook's Part A block.
+
+**(A) Collect data** for the multi-step **rubik-cube twisting** task (long-horizon, bimanual), OR
+**(B) Side-by-side compare** our teleop system against another one — this fork was pending an external
+reply as of 07-29 and may have been resolved on the unlogged 07-30. Both use the teleop bring-up below.
 
 **Teleop bring-up (either track):**
 1. **Orin (driver):** `robo shell -p tianji-driver` →
