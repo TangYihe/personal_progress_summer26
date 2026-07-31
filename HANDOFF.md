@@ -13,8 +13,11 @@
 > `fb50985` for the repo lock), which is exactly what broke the Orin on 07-29. **The rehearsal (Part C) is
 > NOT done — deliberately deferred.** No robot/teleop work this session.
 > Full detail: [notes/weekly-notes/week-2026-07-27.md](notes/weekly-notes/week-2026-07-27.md) (07-31 log).
-> ⚠️ **07-30 was never logged** (only artifact: `notes/checklists/leave-office-sop.md`) — which fork was
-> taken that day is unrecorded.
+>
+> **07-30 (logged retroactively 07-31):** took fork **(A)** — tried collecting the **multi-step** rubik
+> twist and hit a wall: **very hard to teleoperate because hand retargeting isn't smooth.** Reported to
+> the retargeting owner; it's their thread now, and it **gates the whole "more data → train" plan**.
+> The 07-28 drained robot battery came back **fine** (charges normally, no BMS lockout).
 
 ---
 
@@ -49,9 +52,23 @@ question** (13 GB not shipped → no `uv sync --offline` fallback; there's room 
 Seed is also at `/home/yihetang/project26/onsite-seed` on the workstation, and reproducible from the
 runbook's Part A block.
 
-**(A) Collect data** for the multi-step **rubik-cube twisting** task (long-horizon, bimanual), OR
-**(B) Side-by-side compare** our teleop system against another one — this fork was pending an external
-reply as of 07-29 and may have been resolved on the unlogged 07-30. Both use the teleop bring-up below.
+**(A) ⛔ Multi-step data collection is BLOCKED — do not just retry it.** 07-30 showed the task is
+teleop-limited by **hand-retargeting smoothness**, not by data volume. Reported to the retargeting
+owner; **follow up with them for status first.** Demos an operator can barely produce would encode the
+struggle, so fixing the teleop feel precedes collecting. What we can do meanwhile:
+- Feed the owner the specifics in one go: **thumb IP-vs-MCP** unresolved (`thumb_skip_pip: true` caps it
+  upstream of `segment_scaling`), and our LOCAL `wuji_finetune.json` has **index/middle pinch fully OFF
+  (`d1=d2=0` both hands)** — tuned for the *single* twist, likely wrong for a multi-step sequence.
+- Capture A/B candidates with `scripts/inputs/sim_glove_to_hand.py --record` (pushed 07-29) — sim only,
+  no robot needed.
+- Re-decide pinch `d2` (~3.0 restores a real index/middle grasp) + prep the **two stable hand yamls**
+  (pinch-enhanced vs plain; manual swap = `cp` preset + restart teleop).
+- ❓ Check `artifacts/data/robot/` for anything saved during the 07-30 attempt before assuming it's empty.
+
+**(B) Side-by-side compare** our teleop system against another one — still available, and arguably the
+better use of a session while retargeting is someone else's blocker.
+
+Both use the teleop bring-up below.
 
 **Teleop bring-up (either track):**
 1. **Orin (driver):** `robo shell -p tianji-driver` →
@@ -67,9 +84,11 @@ reply as of 07-29 and may have been resolved on the unlogged 07-30. Both use the
    upstream `init_pose capture <name>` (was our `setpose`).
 
 **Open threads to carry:**
-- **🔴 Thumb IP-vs-MCP bending** — unresolved; `segment_scaling.thumb` reset to base default (both hands)
-  didn't move it. `thumb_skip_pip: true` (SDK reconstructs thumb MCP inaccurately) limits it upstream of
-  scaling. **Coordinate with the retargeting owner** for other levers.
+- **🔴 Hand-retargeting smoothness — REPORTED to the owner 07-30, awaiting them.** This is the blocking
+  thread for the multi-step task. Sub-thread: **thumb IP-vs-MCP bending** unresolved —
+  `segment_scaling.thumb` reset to base default (both hands) didn't move it, and `thumb_skip_pip: true`
+  (SDK reconstructs thumb MCP inaccurately) limits it upstream of scaling. Follow up for status; don't
+  re-attempt multi-step collection before it improves.
 - **Still-unpushed SHAREABLE:** `9c83c95` (retargeting pinch 1.5/2.0 + tactile gates off) — held pending
   owner sign-off, because "gates off" bakes in our phantom-pressure + faulty-left-sensor assumption.
 - **Report to william (still owed):** `config/policy/act_turn_cube.yaml` ships `num_workers: 32` → the
