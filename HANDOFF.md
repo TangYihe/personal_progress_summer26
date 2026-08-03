@@ -3,21 +3,19 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-07-31** — **offline-provisioning Part A DONE.** Built + verified the
-> **teleop-only offline seed** (`/home/yihetang/project26/onsite-seed`, **5.8 GB**, also on the USB stick,
-> integrity-checked). Rewrote the runbook against the *post-merge* tree and caught a bug that would have
-> stranded us onsite: **the nix tarball was never captured** (`nix-installer` downloads a nix package →
-> offline install fails at step one; fixed with a shipped, version-matched nix 2.34.7 +
-> `--nix-package-url file://`). Also established that **`~/.cache/nix` is load-bearing**, not optional —
-> refactor-0722 bumped the robo-nix pin so **two revs** must resolve offline (`3c55fa1` for the robo CLI,
-> `fb50985` for the repo lock), which is exactly what broke the Orin on 07-29. **The rehearsal (Part C) is
-> NOT done — deliberately deferred.** No robot/teleop work this session.
-> Full detail: [notes/weekly-notes/week-2026-07-27.md](notes/weekly-notes/week-2026-07-27.md) (07-31 log).
+> Last session: **2026-08-03** — **PLAN CHANGE: the whole workstation travels to the filming site.**
+> On-site provisioning is **retired** (rehearsal, uv-cache decision, TIANJI workstation specs, the
+> NVIDIA/graphics unknown — all moot); the problem is now **transport + re-cabling**. Bonus: the seed was
+> teleop-only, so bringing the box means the **full deploy stack + the validated 16/16 policy come with
+> us** → autonomous shots are on the table. Docs written, no code/robot work.
+> Detail: [notes/weekly-notes/week-2026-08-03.md](notes/weekly-notes/week-2026-08-03.md) (08-03 log).
 >
-> **07-30 (logged retroactively 07-31):** took fork **(A)** — tried collecting the **multi-step** rubik
-> twist and hit a wall: **very hard to teleoperate because hand retargeting isn't smooth.** Reported to
-> the retargeting owner; it's their thread now, and it **gates the whole "more data → train" plan**.
-> The 07-28 drained robot battery came back **fine** (charges normally, no BMS lockout).
+> **🗓️ Shoot 08/11–08/13. Robot packs 2026-08-04 PM → 08-04 AM is (probably) the last hardware window.**
+> ❓ Confirm whether there is a setup day on-site before 08/11 that gives another one.
+>
+> **Still blocked:** the **multi-step** rubik twist is teleop-limited by **hand-retargeting smoothness**
+> (07-30) — the retargeting owner's thread. It gates "more data → train", and it means the shoot script
+> must not depend on the multi-step twist unless it's fixed and verified 08-04.
 
 ---
 
@@ -25,52 +23,48 @@
 
 **Session start:** `git pull` in `we-teleop` (check labmate pushes — the shared branch is
 `origin/refactor-0722`, which includes our `sim_glove_to_hand` commit `69a309c`). Pull the notes repo.
+⚠️ **On 08-04 this is the LAST pull** — do not pull on-site (no uplink → a bumped `flake.lock` breaks
+`robo shell`, exactly as it broke the Orin on 07-29).
 
-**🔀 Pick ONE. The provisioning rehearsal is short and self-contained; the data/compare fork is the
-bigger thread.**
+**🔴 2026-08-04 AM — PRE-PACK VERIFICATION. This is the whole session; the robot packs in the
+afternoon.** Ordered procedure:
+[notes/checklists/2026-08-04-pre-pack-verification.md](notes/checklists/2026-08-04-pre-pack-verification.md)
+- **Part A — bring-up + pipeline sanity.** Driver, gloves, D455 on USB3 5000M, one replay or recorded
+  episode. Optional but valuable: **one autonomous run of the validated policy** — autonomous shots are
+  newly on the table, so confirm the deploy stack still runs while the robot is still here.
+- **Part B — hand configs.** ⚠️ **Decide the pinch question before packing**: index/middle is currently
+  fully OFF (`d1=d2=0`), tuned for the single twist. If the script needs a real grasp, restore `d2`≈3.0
+  and A/B it today. Prepare the **two stable hand yamls** to travel (swap = `cp` preset + restart).
+- **Part C — 🔴 whole-body movement** (the main event; give it the biggest block). `torso: ik` in
+  `config/teleop/pico_world_wuji_hands.yaml:12-13`, sim → robot. **If shaky, tune smoothing today** —
+  knob table with 2026-08-03-verified locations is in the checklist. Fallback: a **static captured lower
+  pose** (`init_pose capture <name>`) with `torso: hold` — capture it as insurance either way.
+- **Part D — config freeze.** Lock `enp13s0` static · **final Orin sync** (this is what finally puts the
+  hands-open-on-shutdown fix on the robot) · commit the travelling state · **cold-boot smoke test**.
+- **Part E — teardown.** 📸 **Photograph and label all cabling before unplugging anything.**
 
-**(0) 🔴 PROVISIONING REHEARSAL — ~20–30 min, no robot needed, everything is already prepared.**
-The seed is built and on the stick. On the **spare workstation, network cable UNPLUGGED**:
+**🔴 Lock `enp13s0` static before packing** — it is DHCP today and `192.168.31.48` is hardcoded in
+`TELEOP_XROBOT_HOST_IP` *and* in the headset app's connect target. Bringing the router keeps the subnet
+but not the lease; if it shifts, the failure looks like *"teleop doesn't track"*.
 ```bash
-sudo -v
-/mnt/seed/provision.sh        # or wherever the stick auto-mounts there
+sudo nmcli con mod "有线连接 1" ipv4.method manual ipv4.addresses 192.168.31.48/24 \
+     ipv4.gateway "" ipv4.dns ""
 ```
-It self-checks and **fails the run if `cache.nixos.org`/`github.com` answer**, so the spare's own
-internet can't fake a pass. Then the one manual step (needs a display):
-```bash
-cd /home/yihetang/project26/we-teleop
-robo shell -p operator
-unset __NV_PRIME_RENDER_OFFLOAD          # shellHook re-exports it on EVERY entry
-we teleop --profile keyboard --driver-address local
-# a MuJoCo window must actually RENDER, not be black
-```
-Bring the drive back → `provision-<host>-<date>.log` is on it. ⚠️ Two things change how to read the
-result: **does the spare already have nix?** (then the offline-install unknown stays untested) and
-**is it NVIDIA?** (if not, a viewer failure is a REAL preview of the TIANJI risk —
-`robo.nix` hardcodes `hostGraphics = "nixgl-nvidia"` for `operator`). Then decide the **uv-cache
-question** (13 GB not shipped → no `uv sync --offline` fallback; there's room on the drive).
-Seed is also at `/home/yihetang/project26/onsite-seed` on the workstation, and reproducible from the
-runbook's Part A block.
+Everything else is unchanged after the move: `enp14s0` = `6.6.7.166` (direct, static), robot `6.6.7.190`,
+Orin `6.6.7.100`, glove dongles static + host routes to `.100/.101`.
 
-**(A) ⛔ Multi-step data collection is BLOCKED — do not just retry it.** 07-30 showed the task is
-teleop-limited by **hand-retargeting smoothness**, not by data volume. Reported to the retargeting
-owner; **follow up with them for status first.** Demos an operator can barely produce would encode the
-struggle, so fixing the teleop feel precedes collecting. What we can do meanwhile:
-- Feed the owner the specifics in one go: **thumb IP-vs-MCP** unresolved (`thumb_skip_pip: true` caps it
-  upstream of `segment_scaling`), and our LOCAL `wuji_finetune.json` has **index/middle pinch fully OFF
-  (`d1=d2=0` both hands)** — tuned for the *single* twist, likely wrong for a multi-step sequence.
-- Capture A/B candidates with `scripts/inputs/sim_glove_to_hand.py --record` (pushed 07-29) — sim only,
-  no robot needed.
-- Re-decide pinch `d2` (~3.0 restores a real index/middle grasp) + prep the **two stable hand yamls**
-  (pinch-enhanced vs plain; manual swap = `cp` preset + restart teleop).
-- ❓ Check `artifacts/data/robot/` for anything saved during the 07-30 attempt before assuming it's empty.
+**Shoot prep (off-robot, anytime):**
+[notes/demo-shoot-prep.md](notes/demo-shoot-prep.md) — script risk register (pre-seeded with our known
+capability risks), props + site requirements, packing list.
+⚠️ **Read the lighting warning in §1a**: our camera runs with **auto-exposure OFF** at an exposure tuned
+to office light. Film-set lighting can blow out the image *and* put it out of distribution for the
+policy. Raise with the crew before the shoot day.
 
-**(B) Side-by-side compare** our teleop system against another one — still available, and arguably the
-better use of a session while retargeting is someone else's blocker.
+**⛔ Multi-step data collection is still BLOCKED** — teleop-limited by hand-retargeting smoothness
+(07-30), the owner's thread. Follow up for status; if it isn't fixed, the script must not depend on it.
+❓ Check `artifacts/data/robot/` for anything saved during the 07-30 attempt before assuming it's empty.
 
-Both use the teleop bring-up below.
-
-**Teleop bring-up (either track):**
+**Teleop bring-up:**
 1. **Orin (driver):** `robo shell -p tianji-driver` →
    `we driver --auto-reset-errors --camera-serial 419222302053 --camera-exposure 100`
    (defaults: robot `6.6.7.190`, `pd`, `--move-to-init`, bimanual hands + camera). ⚠️ init-gate may trip
@@ -79,11 +73,24 @@ Both use the teleop bring-up below.
 2. **Workstation (operator):** fresh `robo shell -p operator` → `unset __NV_PRIME_RENDER_OFFLOAD` →
    `scripts/runtime/pico.sh pico_world_wuji_hands` (Quest tracks via the XRobot service, headset-agnostic;
    head/torso are held LOCAL; both arms + hands live). `Enter` to anchor.
-3. **If track (A):** write a fresh v3 policy config (copy `config/policy/act_turn_cube.yaml` → set
-   `dataset`/`output_dir`, `num_workers: 4`, `include_hands`) once data lands. Capture the grasp start with
-   upstream `init_pose capture <name>` (was our `setpose`).
+3. **Whole-body test (08-04 Part C):** set `torso: ik` in `config/teleop/pico_world_wuji_hands.yaml`
+   (currently `hold` at `:12-13`, our own LOCAL edit). Capture a fallback lower pose with
+   `init_pose capture <name>` (upstream's name for our old `setpose`).
+4. **If data collection ever unblocks:** fresh v3 policy config — copy `config/policy/act_turn_cube.yaml`
+   → set `dataset`/`output_dir`, `num_workers: 4`, `include_hands`.
 
 **Open threads to carry:**
+- **🚚 Transport risks (new, 2026-08-03).** The workstation NIC is an **add-in card** carrying BOTH
+  ethernet ports — if both links misbehave on arrival, **reseat the card first**. Everything gets
+  replugged, so: cross-wired glove cables (07-27), D455 silently dropping to USB2 on an under-seated
+  USB-A plug, the **marked** A→C converter orientation. Expect an init-gate trip on first bring-up.
+- **📴 No internet on-site is fine, but stay frozen.** Entering a `robo shell` must not need to fetch —
+  **do not `git pull` or touch `flake.lock` on-site** (this is what broke the Orin on 07-29). Config/yaml
+  edits are fine; dependency changes are not.
+- **The offline seed is kept as disaster recovery** (`/home/yihetang/project26/onsite-seed` + the USB
+  stick, 5.8 GB, verified). The workstation is now a single point of failure with no spare; carrying the
+  stick costs nothing. Do not delete it —
+  [runbook](notes/checklists/2026-07-29-onsite-provisioning-runbook.md) stays valid as its companion.
 - **🔴 Hand-retargeting smoothness — REPORTED to the owner 07-30, awaiting them.** This is the blocking
   thread for the multi-step task. Sub-thread: **thumb IP-vs-MCP bending** unresolved —
   `segment_scaling.thumb` reset to base default (both hands) didn't move it, and `thumb_skip_pip: true`
