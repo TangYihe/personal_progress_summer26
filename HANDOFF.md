@@ -26,22 +26,43 @@
 ⚠️ **On 08-04 this is the LAST pull** — do not pull on-site (no uplink → a bumped `flake.lock` breaks
 `robo shell`, exactly as it broke the Orin on 07-29).
 
-**🔴 2026-08-04 AM — PRE-PACK VERIFICATION. This is the whole session; the robot packs in the
-afternoon.** Ordered procedure:
+**🔴 2026-08-04 — PRE-PACK VERIFICATION, full day; pack after 17:00** (operator off-shift).
+Ordered procedure:
 [notes/checklists/2026-08-04-pre-pack-verification.md](notes/checklists/2026-08-04-pre-pack-verification.md)
+
+**Priorities inverted 08-03 after the script risk pass: the scripted actions are NOT very dexterous,
+but there is a LOT of whole-body movement.** → whole-body is the day's main event; hands drop to a
+sanity check.
+
 - **Part A — bring-up + pipeline sanity.** Driver, gloves, D455 on USB3 5000M, one replay or recorded
-  episode. Optional but valuable: **one autonomous run of the validated policy** — autonomous shots are
-  newly on the table, so confirm the deploy stack still runs while the robot is still here.
-- **Part B — hand configs.** ⚠️ **Decide the pinch question before packing**: index/middle is currently
-  fully OFF (`d1=d2=0`), tuned for the single twist. If the script needs a real grasp, restore `d2`≈3.0
-  and A/B it today. Prepare the **two stable hand yamls** to travel (swap = `cp` preset + restart).
-- **Part C — 🔴 whole-body movement** (the main event; give it the biggest block). `torso: ik` in
-  `config/teleop/pico_world_wuji_hands.yaml:12-13`, sim → robot. **If shaky, tune smoothing today** —
-  knob table with 2026-08-03-verified locations is in the checklist. Fallback: a **static captured lower
-  pose** (`init_pose capture <name>`) with `torso: hold` — capture it as insurance either way.
-- **Part D — config freeze.** Lock `enp13s0` static · **final Orin sync** (this is what finally puts the
-  hands-open-on-shutdown fix on the robot) · commit the travelling state · **cold-boot smoke test**.
-- **Part E — teardown.** 📸 **Photograph and label all cabling before unplugging anything.**
+  episode. Worth doing while the robot is here: **one autonomous run of the validated policy**.
+- **🔴 Part B — WHOLE-BODY: stand up / squat down** (most of the day). Sim-jog each leg joint to
+  identify it → `torso: ik` in `config/teleop/pico_world_wuji_hands.yaml:12-13` → operator squats →
+  if shaky, work the **lever ladder softest-first** (torso vel/accel caps → per-joint smoothness
+  weights → rest weights → **per-joint freeze** → 1-euro → captured pose). Video it either way, and
+  **capture a fallback squat pose regardless**.
+- **Part C — hands, ~20 min.** Only open decision: does any scripted action need a real index/middle
+  grasp? If yes restore `d2`≈3.0 today; if no, leave `d1=d2=0`. The two-yamls A/B is dropped.
+- **Part D — config freeze.** Lock `enp13s0` static · **final Orin sync** (what finally puts the
+  hands-open-on-shutdown fix *and* any Python smoothing edit on the robot) · commit the travelling
+  state · **cold-boot smoke test**.
+- **Part E — after 17:00.** 📸 **Photograph and label all cabling before unplugging anything.**
+
+**🔎 Key code findings (verified 2026-08-03) — these change what's possible tomorrow:**
+- **Per-joint leg locking EXISTS.** The 07-24 note "no per-joint lock config" is **wrong on this
+  tree.** `profile.torso` is all-or-nothing (`hold`/`ik`, [launcher.py:129](we-teleop/src/teleop/runtime/launcher.py#L129))
+  and `ik` adds all 6 leg joints, **but `config/embodiments.yaml:141` `ik.frozen_joints` subtracts
+  from the IK set** ([solver.py:249](we-teleop/src/teleop/control/kinematics/solver.py#L249)) — frozen
+  joints are excluded from IK and held at the solve seed. Exact names required
+  (`Gento Luna_Leg_J1_Joint`); can't freeze all active joints.
+  ⚠️ **Global to the embodiment, not per-profile** — it hits deploy/replay too.
+- **Which joints to lock:** `start_degrees.torso: [0.0, 60.0, -70.0, 10.0, 0.0, 0.0]`
+  (`config/embodiments.yaml:46-47`). **J2+J3+J4 sum to 0** = the sagittal squat chain; **J1/J5/J6
+  sit at 0** = out-of-plane DOFs → **freezing J1/J5/J6 is kinematically free** for a straight-ahead
+  squat. Freeze J4 only if needed (costs squat range). ⚠️ Inferred from start values, not URDF axes —
+  confirm by sim-jogging each joint first.
+- **Torso rate caps:** `config/runtime.yaml:45-46` = `1.0` rad/s, `10.0` rad/s². The *reset* ramp
+  already uses `0.2`/`0.4` (lines 58-59) and is visibly smooth — a proven-calm target.
 
 **🔴 Lock `enp13s0` static before packing** — it is DHCP today and `192.168.31.48` is hardcoded in
 `TELEOP_XROBOT_HOST_IP` *and* in the headset app's connect target. Bringing the router keeps the subnet

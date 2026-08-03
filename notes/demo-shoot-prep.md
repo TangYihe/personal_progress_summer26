@@ -7,8 +7,12 @@
 > ← [week-2026-08-03](weekly-notes/week-2026-08-03.md) ·
 > [pre-pack verification](checklists/2026-08-04-pre-pack-verification.md)
 >
-> Status: **skeleton + pre-seeded known risks, 2026-08-03.** Sections 1 and 2 need Yihe's pass over
-> the actual script and prop list.
+> Status: **§1 risk pass DONE and §2 prop guide SENT to the filming team, 2026-08-03.**
+>
+> **🔑 Headline finding from the pass: the scripted actions are not very dexterous, but there is a
+> lot of whole-body movement.** That inverts the hardware priorities — **stand up / squat down is
+> the top risk**, and the hand/retargeting work drops to a sanity check. It also means the
+> multi-step twist blocker no longer sits on the critical path for the shoot.
 
 ---
 
@@ -27,9 +31,10 @@ Severity: 🔴 can stop the shot · 🟡 costs time / needs retakes · 🟢 mino
 |---|---|---|---|
 | **Multi-step / long-horizon cube twist** | **Blocked** — teleop-limited by hand-retargeting smoothness (07-30); the retargeting owner's thread | 🔴 | **Do not script it** unless the owner has shipped a fix and we verified it 08-04. Fallback: the *single* horizontal twist, which is validated |
 | **Single horizontal cube twist, autonomous** | **Validated 16/16** (07-24) | 🟢 | Our strongest shot. Now available on-site because the full deploy stack travels |
-| **Fine pinch / picking up thin objects** | Unreliable — index/middle pinch is currently **OFF** (`d1=d2=0`); thumb IP-vs-MCP bending unresolved | 🔴 | Either restore `d2`≈3.0 and A/B it on 08-04, or **choose props that need a power grasp, not a pinch** |
+| **Fine pinch / picking up thin objects** | Unreliable — index/middle pinch is currently **OFF** (`d1=d2=0`); thumb IP-vs-MCP bending unresolved | 🟡 *(downgraded 08-03 — the script isn't dexterous)* | Props chosen for a power grasp, not a pinch. One open decision on 08-04: if *any* action needs a real index/middle grasp, restore `d2`≈3.0 |
+| **🔴 Stand up / squat down** | **The dominant ask of the script.** Untested since the merge; `torso: hold` today (our own edit) | 🔴 | **Top priority 08-04** ([Part B](checklists/2026-08-04-pre-pack-verification.md#part-b--🔴-whole-body-stand-up--squat-down-the-days-main-event)). If not natural: lever ladder → per-joint leg freeze (`J1/J5/J6` are free to lock) → fallback to a captured squatted init pose with `torso: hold` |
 | **Chassis (底盘) driving** | **Cannot be teleoped** — fails closed in `gento.py`, needs a separate controller | 🔴 | Choreograph the base separately from upper-body teleop. ⚠️ **Confirm 08-04 that base + upper body can even move simultaneously** — open since 07-24 |
-| **Torso / squat / height change** | Currently OFF (`torso: hold`, our own edit). All-or-nothing: `hold` or `ik`; no per-joint lock, no height parameter | 🟡 | Tested 08-04 (Part C). If live IK is shaky → **static captured lower pose**, frozen for the take |
+| **Live height change during a take** | `profile.torso` is all-or-nothing (`hold`/`ik`) and there is no height parameter — but **per-joint leg freezing IS available** via `ik.frozen_joints` (verified 08-03) | 🟡 | If live IK can't be made natural, the take runs at a **fixed captured height** — the script needs to know whether height can change *mid-take* or only *between* takes |
 | **Head motion** | `head: hold` (LOCAL) | 🟡 | Re-enable + operator-test, or accept a fixed head |
 | **Long continuous takes** | Wuji hand **overheats** under sustained teleop | 🟡 | Batch takes with cooldowns; tell the crew the robot needs rest between setups, and build it into the schedule |
 | **Robot holds an object at the end of a take** | Hands ramp **open** on driver exit (our fix) — a held object drops | 🟡 | Don't stop the driver mid-hold; catch/place the prop first |
