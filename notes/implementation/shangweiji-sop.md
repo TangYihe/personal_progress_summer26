@@ -49,7 +49,40 @@ Connects to the x86 board at `6.6.7.190`. Workstation must be on the `6.6.7.x` n
 | BODY         | `0, 0, 0, 0, 0, 0` |
 | HEAD         | `0, 0, 0` |
 
-### 打包姿态 — packed/storage pose
+### 打包姿态 — packing / storage pose
+
+> ✅ **VERIFIED 2026-08-04 — this is the pose and procedure actually used to pack the robot for the
+> demo shoot. Use this one.** Speed **10%**. It differs from the earlier vendor values recorded
+> further below.
+
+| Component | Joint angles |
+|-----------|-------------|
+| 左臂 ARM0 (left)  | `120, -90, -90, -90, 0, 0, 0` |
+| 右臂 ARM1 (right) | `-120, -90, 90, -90, 0, 0, 0` |
+| 头 HEAD           | `0, 0` |
+| 腰 BODY           | `0, 87, -140, 52.3, 0, 0` |
+
+**⚠️ ORDER MATTERS — arms and head FIRST, body LAST, and the body step needs a hand on the robot.**
+
+1. **Arms + head to the packing pose.**
+   a. Connect via 上位机, set speed to **10%**.
+   b. Put the arms into **position mode**.
+   c. Paste the joint angles on the right → **Add** → **Run**.
+2. **Disable the arms (下使能) and fold the dexterous hands up toward the body** — click **idle**.
+   The arms go limp here, so the hands can be turned up by hand.
+3. **Support the hands by hand, then move the body (腰) to the packing pose.**
+   Someone holds the hands while the torso goes down.
+
+**Notes on these values:**
+- Body pitch `87 − 140 + 52.3 = −0.7` → the torso stays essentially **vertical** (0.7°), same
+  sum-to-zero family as the teleop stances.
+- ⚠️ `J3 = −140` is 0.5° outside our own `−139.5°` operating limit, and the arms use `J1 = ±120`
+  rather than the `±90` of the teleop start pose. **Reachable through 上位机 only** — 上位机 talks to
+  the x86 directly and does not go through our driver's operating envelope, so this pose cannot be
+  commanded from teleop or an `init_pose`.
+- HEAD takes **2** values here (our model has Head_J1/Head_J2); the older entry below lists 3.
+
+#### 打包姿态 — earlier vendor values (superseded, kept for reference)
 
 | Component | Joint angles |
 |-----------|-------------|
