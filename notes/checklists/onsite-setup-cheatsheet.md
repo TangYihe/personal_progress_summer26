@@ -113,6 +113,32 @@ scripts/runtime/pico.sh pico_world_wuji_hands --driver-address 6.6.7.100
 `pico.sh` **starts the XRobot service itself** (it does **not** survive a reboot, so the first run
 after power-on brings it up; a bare `we teleop` will not).
 
+### 2.2b XRobot service standalone — Quest link / range test, no teleop, no robot
+
+`pico.sh` normally starts the service. To bring it up **alone** — for a Quest connection or
+operator-distance test with no driver, no robot, no battery drain, no hand thermal:
+
+```bash
+cd ~/project26/we-teleop
+robo shell -p operator
+export TELEOP_XROBOT_HOST_IP=192.168.31.48
+source scripts/setup/bootstrap_xrobot_pc_service.sh   # service only — all the Quest needs
+source scripts/setup/bootstrap_xrobot_sdk.sh          # only if you also need the Python binding
+```
+
+⚠️ **`source`, not `bash`.** Both scripts `export` vars the caller needs
+(`TELEOP_XROBOT_SERVICE_BIN`, `TELEOP_XROBOT_PYTHONPATH`, `TELEOP_XROBOT_LIBRARY_PATH`). Run as a
+subprocess, the exports silently vanish. **Same shell throughout.**
+⚠️ `bootstrap_xrobot_sdk.sh` needs the venv → **`robo shell -p operator` first**, or it refuses with
+`Python environment not found`.
+
+- **Idempotent** — re-running prints `already running (pid N)` rather than starting a second copy.
+- **Detached** (`nohup`) — survives closing the shell, but **not** a reboot.
+- Log `.runtime-state/xrobot/service.log` — terse; `release mode` alone is a normal full log.
+- Stop: `kill $(cat .runtime-state/xrobot/service.pid)`.
+- A stale `service.pid` from a dead process is harmless — the script validates the pid against the
+  binary before trusting it.
+
 ### 2.3 In-session commands
 | Command | Effect |
 |---|---|
@@ -244,7 +270,7 @@ teleop or an `init_pose`. Full procedure: [shangweiji-sop.md](../implementation/
 
 | Thing | Value |
 |---|---|
-| Workstation teleop LAN | `192.168.31.48` (`enp13s0`, DHCP, `有线连接 1`) |
+| Workstation teleop LAN | `192.168.31.48` (`enp13s0`, **STATIC** since 08-09, `有线连接 1`) |
 | Workstation ↔ robot | `6.6.7.166` (`enp14s0`, static, `有线连接 2`) |
 | Robot x86 / Orin / chassis | `6.6.7.190` / `6.6.7.100` / `6.6.7.6` |
 | Gloves L / R | `192.168.1.100:50001` / `192.168.1.101:50001` |

@@ -3,23 +3,68 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-08-03** — **PLAN CHANGE: the whole workstation travels to the filming site.**
-> On-site provisioning is **retired** (rehearsal, uv-cache decision, TIANJI workstation specs, the
-> NVIDIA/graphics unknown — all moot); the problem is now **transport + re-cabling**. Bonus: the seed was
-> teleop-only, so bringing the box means the **full deploy stack + the validated 16/16 policy come with
-> us** → autonomous shots are on the table. Docs written, no code/robot work.
-> Detail: [notes/weekly-notes/week-2026-08-03.md](notes/weekly-notes/week-2026-08-03.md) (08-03 log).
+> Last session: **2026-08-17** — back from the demo shoot (08/11–08/13, **completed**).
+> **The labmates rewrote the repo's history.** `origin/develop` shares **zero ancestry** with our tree;
+> `refactor-0722` is dead. Decision: **adopt `develop` wholesale, don't migrate our deltas.** It is
+> checked out as a second worktree; the shoot tree is archived and stays runnable.
+> No robot work today — no bring-up, no charger check, nothing run on `develop`.
+> Detail + full migration checklist: [notes/weekly-notes/week-2026-08-17.md](notes/weekly-notes/week-2026-08-17.md).
 >
-> **🗓️ Shoot 08/11–08/13. Robot packs 2026-08-04 PM → 08-04 AM is (probably) the last hardware window.**
-> ❓ Confirm whether there is a setup day on-site before 08/11 that gives another one.
+> ⚠️ **`CHEATSHEET.md` and every `notes/checklists/` runbook are stale for `develop`** (`pico.sh` →
+> `we teleop`, `sync_luna.sh` → `sync_base.sh`/`sync_repo.sh`). Don't rewrite them until the migration
+> verifies; don't trust them either.
 >
-> **Still blocked:** the **multi-step** rubik twist is teleop-limited by **hand-retargeting smoothness**
-> (07-30) — the retargeting owner's thread. It gates "more data → train", and it means the shoot script
-> must not depend on the multi-step twist unless it's fixed and verified 08-04.
+> 📋 **The shoot week itself (08-10 → 08-16) has NO note** — no internet on site. Reconstruct from
+> memory this week while it's still recoverable.
 
 ---
 
-## WHEN YOU'RE BACK — next session (start here)
+## WHEN YOU'RE BACK — 2026-08-18 (start here)
+
+**Two worktrees now.** `~/project26/we-teleop` = shoot tree (`wip/post-shoot-20260817`, the fallback,
+keep it runnable) · `~/project26/we-teleop-develop` = `develop` (new primary).
+
+**In this order — do not reorder 1 and 2:**
+
+1. 🔴 **Read battery SoC in 上位机 before anything else.** Charger unverified since 08-09, robot left
+   unplugged overnight 08-10, transported since. No response from the charger = BMS deep-discharge
+   lockout → **do not force it, contact TIANJI.**
+2. 🔴 **Transport re-check on the OLD tree** (`we-teleop/`) — driver + teleop + one episode. It worked
+   on 08-13, so a failure here is *hardware*, not migration. Debugging both at once is the expensive
+   mistake. Check: NIC add-in card (reseat first if both ports misbehave), glove cross-wiring, D455 on
+   USB3 5000M, marked A→C converter orientation, init-gate.
+3. **`git pull` in the `develop` worktree** — its tip moved the same day we cloned it; it's active daily.
+4. **First `robo shell -p operator` there** → runs a `uv sync` (`uv.lock` + `pyproject.toml` differ).
+   ✅ `flake.lock` is **identical** to ours, so the nix layer is cached — this should not refetch the
+   world. Needs internet; do it at the office.
+5. **Restore machine-local identity** (NOT upstream — `develop` won't find the hardware without it):
+   Wuji right `306735523434`, camera `419222302053`, `6.6.7.190`/`.100`/`.6`, `enp14s0` = `6.6.7.166`,
+   `enp13s0` static `192.168.31.48`, glove dongles `.100`/`.101` + host routes. Read the values out of
+   `06757f6 LOCAL machine config` on the archived branch — don't cherry-pick it.
+6. **`we teleop`** is the entry point now.
+
+**⛔ Do NOT casually sync the Orin.** It holds exactly one version — the moment it runs `develop`, the
+shoot tree stops being a fallback. **That is the point of no return.** Until then, operator-side
+`develop` against the old Orin driver is a protocol mismatch; don't read that failure as a verdict.
+⚠️ Verify the new sync scripts' default remote — the old `sync_luna.sh` defaulted to a *different robot*.
+
+**❓ Biggest open unknown: do our datasets + the validated 16/16 policy survive the rewrite?**
+`act_turn_cube.yaml` is gone, `dp_dit` → `flow_dit`, data layer rebuilt on MCAP. Read `docs/policy.md`
+("native conversion", "portable checkpoints") on `develop` before assuming anything loads.
+
+**⚠️ `develop` now contains a lot of policy-training work in our own area** — delta/EE representation
+studies, LR-schedule and data-scaling ablations, an experiment ledger, GR00T RLT, and
+`config/experiments/pretraining/glove_value.yaml` + a `pretrain-from-develop-8-12` branch. That is the
+two-stage IL question we lead. Needs a scope/ownership conversation with the team, not a code fix.
+
+**Carried debts:** shoot-week note · hand-retargeting smoothness (reported 07-30, no status since,
+still the multi-step blocker) · `9c83c95` unpushed and probably orphaned by the rewrite · the
+`num_workers: 32` segfault report to william (check if it survived) · the "Daddy" line in
+`we-teleop/CLAUDE.md` (check if it survived).
+
+---
+
+## WHEN YOU'RE BACK — 2026-08-04 (archived — pre-pack day; the shoot has since happened)
 
 **Session start:** `git pull` in `we-teleop` (check labmate pushes — the shared branch is
 `origin/refactor-0722`, which includes our `sim_glove_to_hand` commit `69a309c`). Pull the notes repo.
