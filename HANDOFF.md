@@ -3,23 +3,96 @@
 > Session bookmark. **Current state only** — no history (that lives in the README progress
 > log). Update at the end of every working session: what's done, where to pick up next.
 >
-> Last session: **2026-08-17** — back from the demo shoot (08/11–08/13, **completed**).
-> **The labmates rewrote the repo's history.** `origin/develop` shares **zero ancestry** with our tree;
-> `refactor-0722` is dead. Decision: **adopt `develop` wholesale, don't migrate our deltas.** It is
-> checked out as a second worktree; the shoot tree is archived and stays runnable.
-> No robot work today — no bring-up, no charger check, nothing run on `develop`.
-> Detail + full migration checklist: [notes/weekly-notes/week-2026-08-17.md](notes/weekly-notes/week-2026-08-17.md).
+> Last session: **2026-08-18** — **the migration works on real hardware.** `develop` now drives the
+> robot: arms, torso, head, both hands, gloves, PICO/Quest. The **Orin is synced** (point of no
+> return crossed, 08-18). One real hardware fault found — the **left thumb** — plus two upstream bugs
+> (driver has no SIGINT handling; init gate still hardcoded).
+> Full session detail: [notes/weekly-notes/week-2026-08-17.md](notes/weekly-notes/week-2026-08-17.md).
 >
 > ⚠️ **`CHEATSHEET.md` and every `notes/checklists/` runbook are stale for `develop`** (`pico.sh` →
-> `we teleop`, `sync_luna.sh` → `sync_base.sh`/`sync_repo.sh`). Don't rewrite them until the migration
-> verifies; don't trust them either.
+> `we teleop`, `sync_luna.sh` → **`sync_repo.sh`** — *not* `sync_base.sh`, which is the chassis).
+> They can now be rewritten from the working commands below, and should be.
 >
 > 📋 **The shoot week itself (08-10 → 08-16) has NO note** — no internet on site. Reconstruct from
 > memory this week while it's still recoverable.
 
 ---
 
-## WHEN YOU'RE BACK — 2026-08-18 (start here)
+## WHEN YOU'RE BACK — 2026-08-19 (start here)
+
+**Where it stands:** `develop` runs the robot. The Orin is synced. Teleop works end to end. What is
+left before collection: the **camera** (Stage D) and the **left thumb**.
+
+### 🔧 1. Left thumb — hardware, diagnosed 08-18
+
+Sim (`we teleop --profile keyboard_wuji_hands --sim`) is clean and Wuji Studio is clean; the physical
+thumb misposes. Suspect one or more thumb motors.
+
+- ⛔ **Do NOT unmount the hand.** `develop` cannot run one-handed: every configured serial must be
+  present, `"auto"` doesn't rescue a missing side, `--hands` is all-or-nothing, and there is no
+  single-side profile. A faulty-but-**attached** hand detaches per-side and lets the right hand keep
+  working; a **removed** hand blocks the driver entirely.
+- **The Wuji HMI can't run on the Orin** — `wujihand-hmi` v1.5.1 ships `amd64` `.deb` + Windows only,
+  **no aarch64**, and it's a GUI app. **Plan: move the hand's USB cable Orin → workstation** and run
+  the HMI there. Only the USB endpoint moves; the hand stays on the wrist.
+- ⚠️ **Stop the driver first** — the SDK takes exclusive ownership of the hand.
+- Fallbacks: `usbip` Orin → workstation, or a `wujihandpy` readback script on the Orin (thumb = row 0
+  of the 5×4 layout, joints 0–3; command small bounded deltas, compare `get_joint_actual_position()`).
+
+### 📷 2. Camera — Stage D, the last driver piece
+
+`develop` assumes a **D405** and fails hard: `exactly one attached D405 is required, found 0`. Ours is
+the D455 `419222302053`. Add a `d455` profile to `config/cameras.yaml` or repoint `tianji_head_d405`.
+**Until this is done there is no image modality, so no usable recording.**
+
+### ✅ Working commands (verified on hardware 2026-08-18)
+
+```bash
+# workstation — always from the tree root (config resolution is cwd-first)
+cd ~/project26/we-teleop-develop && robo shell -p operator
+we device pico bootstrap          # replaces bootstrap_xrobot_pc_service.sh (needs the 2 XRobo submodules)
+we device wuji network            # replaces hand-rolled ip route; run INTERACTIVELY (teleop uses sudo -n)
+we teleop --profile pico_world_wuji_hands --driver-address 6.6.7.100
+
+# Orin (6.6.7.100) — the Gento controller is 6.6.7.190
+cd ~/we-teleop && robo shell -p tianji-driver
+we driver --camera none --no-wrist --auto-reset-errors
+
+# sync workstation → Orin (REQUIRED after every config/code edit; driver reads config at startup)
+scripts/setup/sync_repo.sh nvidia@6.6.7.100 robot      # look for "+local-edits" in the banner
+```
+
+⚠️ **Do not run `we` via `uv run --extra X`** — that reconciles the venv to exactly `X` and silently
+uninstalls `wuji-glove`. Inside a `robo shell`, just run `we …`.
+⚠️ **Ctrl-C is not a stop button.** The driver has no signal handling; Ctrl-C left the arms energized
+on 08-18 and needed a physical robot restart. The e-stop is the stop.
+
+### 🔒 Three LOCAL deltas on `develop` — uncommitted, do-not-push
+
+| file | change |
+|---|---|
+| `config/inputs/wuji.yaml` | our hand serials L `366239543134` / R `306735523434` |
+| `src/teleop/runtime/driver/__init__.py:207` | init gate `0.5°` → `2.5°` (hands make 0.5° unreachable) |
+| `config/teleop/pico_world_wuji_hands.yaml` | `torso: ik` → `hold` |
+
+Every sync carries them; any `checkout`/`stash`/`pull` drops them, and the first two then resurface as
+`configured Wuji controller is not connected` and a 90 s init-pose timeout. **Fold into one
+`LOCAL machine config -- DO NOT PUSH` commit** once the camera serial lands.
+
+### Still open
+
+- **Battery SoC** never read (carried since 08-09) · **`git pull`** on the develop worktree never done
+  (HEAD still `2031c26a`).
+- **Owed upstream:** no-SIGINT-handler shutdown bug · init gate hardcoded · ask for single-side hand
+  support back (our 16/16 dataset is `sides:[right]`) · `num_workers: 32` to william.
+- **Re-ask the retargeting owner:** the rewrite replaced the retargeter (`backend: sdk`), which likely
+  answers the 07-30 smoothness blocker. Re-test the multi-step twist before assuming it's still blocked.
+- ⚠️ **PD gains changed** (`arm_pd_kp` J5–J7 `10 → 1.5`) — a confound for the 16/16 policy eval,
+  alongside data portability.
+
+---
+
+## WHEN YOU'RE BACK — 2026-08-18 (archived — completed; see 08-19 above)
 
 **Two worktrees now.** `~/project26/we-teleop` = shoot tree (`wip/post-shoot-20260817`, the fallback,
 keep it runnable) · `~/project26/we-teleop-develop` = `develop` (new primary).
